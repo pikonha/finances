@@ -1,0 +1,39 @@
+services:
+  app:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && pnpm install --dangerously-allow-all-builds && pnpm dev --host"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/finances
+      BETTER_AUTH_SECRET: dev-secret-dev-secret-dev-secret-123
+      BETTER_AUTH_URL: http://localhost:3000
+      HERMES_WEBHOOK_SECRET: dev
+      HERMES_USER_ID: dev
+      CRON_SECRET: dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: finances
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:
+  node_modules:

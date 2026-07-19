@@ -9,49 +9,55 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TransactionsRouteImport } from './routes/transactions'
-import { Route as RecurrenceRouteImport } from './routes/recurrence'
-import { Route as InstallmentsRouteImport } from './routes/installments'
-import { Route as CategoriesRouteImport } from './routes/categories'
-import { Route as CardsRouteImport } from './routes/cards'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as ApiTransactionsRouteImport } from './routes/api/transactions'
+import { Route as AuthedTransactionsRouteImport } from './routes/_authed/transactions'
+import { Route as AuthedFaturasRouteImport } from './routes/_authed/faturas'
+import { Route as AuthedAccountsRouteImport } from './routes/_authed/accounts'
 import { Route as ApiCronMaterializeRecurrenceRouteImport } from './routes/api/cron.materialize-recurrence'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth.$'
 
-const TransactionsRoute = TransactionsRouteImport.update({
-  id: '/transactions',
-  path: '/transactions',
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RecurrenceRoute = RecurrenceRouteImport.update({
-  id: '/recurrence',
-  path: '/recurrence',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InstallmentsRoute = InstallmentsRouteImport.update({
-  id: '/installments',
-  path: '/installments',
+const AuthedRoute = AuthedRouteImport.update({
+  id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CategoriesRoute = CategoriesRouteImport.update({
-  id: '/categories',
-  path: '/categories',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CardsRoute = CardsRouteImport.update({
-  id: '/cards',
-  path: '/cards',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IndexRoute = IndexRouteImport.update({
+const AuthedIndexRoute = AuthedIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthedRoute,
 } as any)
 const ApiTransactionsRoute = ApiTransactionsRouteImport.update({
   id: '/api/transactions',
   path: '/api/transactions',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedTransactionsRoute = AuthedTransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedFaturasRoute = AuthedFaturasRouteImport.update({
+  id: '/faturas',
+  path: '/faturas',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedAccountsRoute = AuthedAccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
+  getParentRoute: () => AuthedRoute,
 } as any)
 const ApiCronMaterializeRecurrenceRoute =
   ApiCronMaterializeRecurrenceRouteImport.update({
@@ -59,125 +65,122 @@ const ApiCronMaterializeRecurrenceRoute =
     path: '/api/cron/materialize-recurrence',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/cards': typeof CardsRoute
-  '/categories': typeof CategoriesRoute
-  '/installments': typeof InstallmentsRoute
-  '/recurrence': typeof RecurrenceRoute
-  '/transactions': typeof TransactionsRoute
+  '/': typeof AuthedIndexRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/accounts': typeof AuthedAccountsRoute
+  '/faturas': typeof AuthedFaturasRoute
+  '/transactions': typeof AuthedTransactionsRoute
   '/api/transactions': typeof ApiTransactionsRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/materialize-recurrence': typeof ApiCronMaterializeRecurrenceRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/cards': typeof CardsRoute
-  '/categories': typeof CategoriesRoute
-  '/installments': typeof InstallmentsRoute
-  '/recurrence': typeof RecurrenceRoute
-  '/transactions': typeof TransactionsRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/accounts': typeof AuthedAccountsRoute
+  '/faturas': typeof AuthedFaturasRoute
+  '/transactions': typeof AuthedTransactionsRoute
   '/api/transactions': typeof ApiTransactionsRoute
+  '/': typeof AuthedIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/materialize-recurrence': typeof ApiCronMaterializeRecurrenceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/cards': typeof CardsRoute
-  '/categories': typeof CategoriesRoute
-  '/installments': typeof InstallmentsRoute
-  '/recurrence': typeof RecurrenceRoute
-  '/transactions': typeof TransactionsRoute
+  '/_authed': typeof AuthedRouteWithChildren
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/_authed/accounts': typeof AuthedAccountsRoute
+  '/_authed/faturas': typeof AuthedFaturasRoute
+  '/_authed/transactions': typeof AuthedTransactionsRoute
   '/api/transactions': typeof ApiTransactionsRoute
+  '/_authed/': typeof AuthedIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/materialize-recurrence': typeof ApiCronMaterializeRecurrenceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/cards'
-    | '/categories'
-    | '/installments'
-    | '/recurrence'
+    | '/login'
+    | '/signup'
+    | '/accounts'
+    | '/faturas'
     | '/transactions'
     | '/api/transactions'
+    | '/api/auth/$'
     | '/api/cron/materialize-recurrence'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/'
-    | '/cards'
-    | '/categories'
-    | '/installments'
-    | '/recurrence'
+    | '/login'
+    | '/signup'
+    | '/accounts'
+    | '/faturas'
     | '/transactions'
     | '/api/transactions'
+    | '/'
+    | '/api/auth/$'
     | '/api/cron/materialize-recurrence'
   id:
     | '__root__'
-    | '/'
-    | '/cards'
-    | '/categories'
-    | '/installments'
-    | '/recurrence'
-    | '/transactions'
+    | '/_authed'
+    | '/login'
+    | '/signup'
+    | '/_authed/accounts'
+    | '/_authed/faturas'
+    | '/_authed/transactions'
     | '/api/transactions'
+    | '/_authed/'
+    | '/api/auth/$'
     | '/api/cron/materialize-recurrence'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  CardsRoute: typeof CardsRoute
-  CategoriesRoute: typeof CategoriesRoute
-  InstallmentsRoute: typeof InstallmentsRoute
-  RecurrenceRoute: typeof RecurrenceRoute
-  TransactionsRoute: typeof TransactionsRoute
+  AuthedRoute: typeof AuthedRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  SignupRoute: typeof SignupRoute
   ApiTransactionsRoute: typeof ApiTransactionsRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiCronMaterializeRecurrenceRoute: typeof ApiCronMaterializeRecurrenceRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/transactions': {
-      id: '/transactions'
-      path: '/transactions'
-      fullPath: '/transactions'
-      preLoaderRoute: typeof TransactionsRouteImport
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/recurrence': {
-      id: '/recurrence'
-      path: '/recurrence'
-      fullPath: '/recurrence'
-      preLoaderRoute: typeof RecurrenceRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/installments': {
-      id: '/installments'
-      path: '/installments'
-      fullPath: '/installments'
-      preLoaderRoute: typeof InstallmentsRouteImport
+    '/_authed': {
+      id: '/_authed'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/categories': {
-      id: '/categories'
-      path: '/categories'
-      fullPath: '/categories'
-      preLoaderRoute: typeof CategoriesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cards': {
-      id: '/cards'
-      path: '/cards'
-      fullPath: '/cards'
-      preLoaderRoute: typeof CardsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
+    '/_authed/': {
+      id: '/_authed/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedIndexRouteImport
+      parentRoute: typeof AuthedRoute
     }
     '/api/transactions': {
       id: '/api/transactions'
@@ -186,6 +189,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authed/transactions': {
+      id: '/_authed/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof AuthedTransactionsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/faturas': {
+      id: '/_authed/faturas'
+      path: '/faturas'
+      fullPath: '/faturas'
+      preLoaderRoute: typeof AuthedFaturasRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/accounts': {
+      id: '/_authed/accounts'
+      path: '/accounts'
+      fullPath: '/accounts'
+      preLoaderRoute: typeof AuthedAccountsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/api/cron/materialize-recurrence': {
       id: '/api/cron/materialize-recurrence'
       path: '/api/cron/materialize-recurrence'
@@ -193,17 +217,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCronMaterializeRecurrenceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AuthedRouteChildren {
+  AuthedAccountsRoute: typeof AuthedAccountsRoute
+  AuthedFaturasRoute: typeof AuthedFaturasRoute
+  AuthedTransactionsRoute: typeof AuthedTransactionsRoute
+  AuthedIndexRoute: typeof AuthedIndexRoute
+}
+
+const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedAccountsRoute: AuthedAccountsRoute,
+  AuthedFaturasRoute: AuthedFaturasRoute,
+  AuthedTransactionsRoute: AuthedTransactionsRoute,
+  AuthedIndexRoute: AuthedIndexRoute,
+}
+
+const AuthedRouteWithChildren =
+  AuthedRoute._addFileChildren(AuthedRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  CardsRoute: CardsRoute,
-  CategoriesRoute: CategoriesRoute,
-  InstallmentsRoute: InstallmentsRoute,
-  RecurrenceRoute: RecurrenceRoute,
-  TransactionsRoute: TransactionsRoute,
+  AuthedRoute: AuthedRouteWithChildren,
+  LoginRoute: LoginRoute,
+  SignupRoute: SignupRoute,
   ApiTransactionsRoute: ApiTransactionsRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiCronMaterializeRecurrenceRoute: ApiCronMaterializeRecurrenceRoute,
 }
 export const routeTree = rootRouteImport

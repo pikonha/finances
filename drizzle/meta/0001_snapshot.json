@@ -1,6 +1,6 @@
 {
-  "id": "9c7e3dd7-45bb-42d5-abdd-3350aa746644",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "49099749-df93-43fd-bee8-9de95df47206",
+  "prevId": "9c7e3dd7-45bb-42d5-abdd-3350aa746644",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -39,6 +39,25 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
+        },
+        "closing_day": {
+          "name": "closing_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_day": {
+          "name": "due_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prepaid": {
+          "name": "prepaid",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {},
@@ -105,6 +124,86 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.fatura_payment": {
+      "name": "fatura_payment",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cycle_key": {
+          "name": "cycle_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "fatura_payment_user_id_user_id_fk": {
+          "name": "fatura_payment_user_id_user_id_fk",
+          "tableFrom": "fatura_payment",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "fatura_payment_account_id_account_id_fk": {
+          "name": "fatura_payment_account_id_account_id_fk",
+          "tableFrom": "fatura_payment",
+          "tableTo": "account",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "uq_fatura_payment": {
+          "name": "uq_fatura_payment",
+          "nullsNotDistinct": false,
+          "columns": [
+            "account_id",
+            "cycle_key"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -331,6 +430,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "counter_account_id": {
+          "name": "counter_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "installment_plan_id": {
           "name": "installment_plan_id",
           "type": "uuid",
@@ -397,6 +502,19 @@
           "tableTo": "account",
           "columnsFrom": [
             "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "transaction_counter_account_id_account_id_fk": {
+          "name": "transaction_counter_account_id_account_id_fk",
+          "tableFrom": "transaction",
+          "tableTo": "account",
+          "columnsFrom": [
+            "counter_account_id"
           ],
           "columnsTo": [
             "id"
@@ -828,7 +946,8 @@
       "schema": "public",
       "values": [
         "earn",
-        "expend"
+        "expend",
+        "transfer"
       ]
     }
   },

@@ -1,69 +1,20 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
+import { LogOut, WalletCards } from 'lucide-react'
+import { authClient } from '#/lib/auth-client'
+import { Button } from './ui/button'
 import ThemeToggle from './ThemeToggle'
 
 export default function Header() {
-  return (
-    <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--header-bg)] px-4 backdrop-blur-lg">
-      <nav className="page-wrap flex flex-wrap items-center gap-x-3 gap-y-2 py-3 sm:py-4">
-        <h2 className="m-0 flex-shrink-0 text-base font-semibold tracking-tight">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-3 py-1.5 text-sm text-[var(--sea-ink)] no-underline shadow-[0_8px_24px_rgba(30,90,72,0.08)] sm:px-4 sm:py-2"
-          >
-            <span className="h-2 w-2 rounded-full bg-[linear-gradient(90deg,#56c6be,#7ed3bf)]" />
-            Finances
-          </Link>
-        </h2>
-
-        <div className="order-3 flex w-full flex-wrap items-center gap-x-4 gap-y-1 pb-1 text-sm font-semibold sm:order-none sm:w-auto sm:flex-nowrap sm:pb-0">
-          <Link
-            to="/"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/transactions"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Transactions
-          </Link>
-          <Link
-            to="/cards"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Cards
-          </Link>
-          <Link
-            to="/categories"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Categories
-          </Link>
-          <Link
-            to="/installments"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Installments
-          </Link>
-          <Link
-            to="/recurrence"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Recurrence
-          </Link>
-        </div>
-
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-          <ThemeToggle />
-        </div>
-      </nav>
-    </header>
-  )
+  const router = useRouter()
+  const { data: session } = authClient.useSession()
+  return <header className='sticky top-0 z-40 border-b bg-background/85 backdrop-blur-lg'><nav className='page-wrap flex min-h-14 flex-wrap items-center gap-5 py-2'>
+    <Link to='/' className='flex items-center gap-2 font-semibold text-foreground no-underline'><WalletCards className='size-5 text-primary'/> Finances</Link>
+    {session?.user && <div className='flex flex-1 flex-wrap items-center gap-4 text-sm font-medium'>
+      <Link to='/' className='nav-link' activeProps={{className:'nav-link is-active'}}>Dashboard</Link>
+      <Link to='/transactions' className='nav-link' activeProps={{className:'nav-link is-active'}}>Transactions</Link>
+      <Link to='/accounts' className='nav-link' activeProps={{className:'nav-link is-active'}}>Accounts</Link>
+      <Link to='/faturas' className='nav-link' activeProps={{className:'nav-link is-active'}}>Faturas</Link>
+    </div>}
+    <div className='ml-auto flex items-center gap-2'><ThemeToggle/>{session?.user && <><span className='hidden text-xs text-muted-foreground md:inline'>{session.user.email}</span><Button variant='ghost' size='icon' aria-label='Sign out' onClick={async()=>{ await authClient.signOut(); await router.invalidate(); await router.navigate({to:'/login'}) }}><LogOut className='size-4'/></Button></>}</div>
+  </nav></header>
 }
