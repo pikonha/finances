@@ -7,7 +7,18 @@ Multi-user personal finance app built with TanStack Start, Better Auth, Drizzle/
 ```bash
 pnpm install
 pnpm db:push
+pnpm db:seed
 pnpm dev
+```
+
+`pnpm db:seed` replaces only the local demo user and is safe to rerun. It refuses remote database hosts. Demo login: `a@b.com` / `1234`.
+
+With Docker Compose, no local env file is needed:
+
+```bash
+docker compose up -d
+docker compose exec app pnpm db:push
+docker compose exec app pnpm db:seed
 ```
 
 Required environment variables:
@@ -31,6 +42,7 @@ CRON_SECRET=...
 - `pnpm db:generate` — generate migration
 - `pnpm db:push` — synchronize a development database
 - `pnpm db:migrate` — apply generated migrations
+- `pnpm db:seed` — reset deterministic demo data in a local database
 - `pnpm start` — run `.output/server/index.mjs`
 
 ## Railway

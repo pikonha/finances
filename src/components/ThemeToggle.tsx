@@ -1,4 +1,47 @@
-import { Moon, Sun, SunMoon } from 'lucide-react'; import { useEffect, useState } from 'react'; import { Button } from './ui/button'
-type Mode = 'light' | 'dark' | 'auto'
-function apply(mode: Mode) { const resolved = mode === 'auto' && matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : mode === 'auto' ? 'light' : mode; document.documentElement.classList.toggle('dark', resolved === 'dark'); document.documentElement.style.colorScheme = resolved }
-export default function ThemeToggle() { const [mode,setMode]=useState<Mode>('auto'); useEffect(()=>{ const saved=localStorage.getItem('theme'); const initial=saved==='light'||saved==='dark'?saved:'auto'; setMode(initial); apply(initial) },[]); useEffect(()=>{ if(mode!=='auto') return; const media=matchMedia('(prefers-color-scheme:dark)'); const fn=()=>apply('auto'); media.addEventListener('change',fn); return()=>media.removeEventListener('change',fn)},[mode]); const Icon=mode==='light'?Sun:mode==='dark'?Moon:SunMoon; return <Button variant='ghost' size='icon' aria-label={`Theme: ${mode}`} onClick={()=>{ const next=mode==='light'?'dark':mode==='dark'?'auto':'light'; setMode(next); localStorage.setItem('theme',next); apply(next)}}><Icon className='size-4'/></Button> }
+import { Moon, Sun, SunMoon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "./ui/button";
+type Mode = "light" | "dark" | "auto";
+function apply(mode: Mode) {
+  const resolved =
+    mode === "auto" && matchMedia("(prefers-color-scheme:dark)").matches
+      ? "dark"
+      : mode === "auto"
+        ? "light"
+        : mode;
+  document.documentElement.classList.toggle("dark", resolved === "dark");
+  document.documentElement.style.colorScheme = resolved;
+}
+export default function ThemeToggle() {
+  const [mode, setMode] = useState<Mode>("auto");
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    const initial = saved === "light" || saved === "dark" ? saved : "auto";
+    setMode(initial);
+    apply(initial);
+  }, []);
+  useEffect(() => {
+    if (mode !== "auto") return;
+    const media = matchMedia("(prefers-color-scheme:dark)");
+    const fn = () => apply("auto");
+    media.addEventListener("change", fn);
+    return () => media.removeEventListener("change", fn);
+  }, [mode]);
+  const Icon = mode === "light" ? Sun : mode === "dark" ? Moon : SunMoon;
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={`Tema: ${mode === "light" ? "claro" : mode === "dark" ? "escuro" : "automático"}`}
+      onClick={() => {
+        const next =
+          mode === "light" ? "dark" : mode === "dark" ? "auto" : "light";
+        setMode(next);
+        localStorage.setItem("theme", next);
+        apply(next);
+      }}
+    >
+      <Icon className="size-4" />
+    </Button>
+  );
+}
