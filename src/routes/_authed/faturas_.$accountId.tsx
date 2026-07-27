@@ -1,0 +1,260 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { listCategories } from "#/server/categories";
+import {
+  listFaturas,
+  markFaturaPaid,
+  unmarkFaturaPaid,
+} from "#/server/faturas";
+import {
+  listInstallmentPlans,
+  listTransactions,
+} from "#/server/transactions";
+import { cycleKeyFor } from "#/lib/faturas";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+export const Route = createFileRoute("/_authed/faturas_/$accountId")({
+  component: FaturaDetail,
+});
+
+const money = (cents: number) =>
+  (cents / 100).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+const statusVariant = {
+  open: "default",
+  closed: "secondary",
+  paid: "outline",
+  overdue: "destructive",
+} as const;
+const statusLabel = {
+  open: "aberta",
+  closed: "fechada",
+  paid: "paga",
+  overdue: "atrasada",
+} as const;
+
+function FaturaDetail() {
+  const { accountId } = Route.useParams();
+  const queryClient = useQueryClient();
+  const { data: faturas = [], isPending: faturasPending } = useQuery({
+    queryKey: ["faturas"],
+    queryFn: () => listFaturas(),
+  });
+  const { data: transactions = [] } = useQuery({
+    queryKey: ["transactions"],
+    queryFn: () => listTransactions(),
+  });
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => listCategories(),
+  });
+  const { data: plans = [] } = useQuery({
+    queryKey: ["installmentPlans"],
+    queryFn: () => listInstallmentPlans(),
+  });
+  const cycles = useMemo(
+    () => faturas.filter((fatura) => fatura.accountId === accountId),
+    [accountId, faturas]
+  );
+  const [cycleIdx, setCycleIdx] = useState(0);
+  const initializedAccount = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!cycles.length || initializedAccount.current === accountId) return;
+    setCycleIdx(Math.max(0, cycles.findIndex((cycle) => cycle.isCurrent)));
+    initializedAccount.current = accountId;
+  }, [accountId, cycles]);
+  useEffect(() => {
+    if (cycleIdx >= cycles.length) setCycleIdx(Math.max(0, cycles.length - 1));
+  }, [cycleIdx, cycles.length]);
+
+  const selected = cycles[cycleIdx];
+  const expenses = selected
+    ? transactions.filter(
+        (transaction) =>
+          transaction.type === "expend" &&
+          transaction.accountId === accountId &&
+          cycleKeyFor(transaction.date, selected.closingDay) ===
+            selected.cycleKey
+      )
+    : [];
+  const categoryNames = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.name])),
+    [categories]
+  );
+  const planCounts = useMemo(
+    () => new Map(plans.map((plan) => [plan.id, plan.count])),
+    [plans]
+  );
+  const installmentIndexes = useMemo(() => {
+    const groups = new Map<string, typeof transactions>();
+    for (const transaction of transactions) {
+      if (!transaction.installmentPlanId) continue;
+      const group = groups.get(transaction.installmentPlanId) ?? [];
+      group.push(transaction);
+      groups.set(transaction.installmentPlanId, group);
+    }
+    const indexes = new Map<string, number>();
+    for (const group of groups.values()) {
+      group.sort((a, b) => a.date.localeCompare(b.date));
+      group.forEach((transaction, index) => indexes.set(transaction.id, index + 1));
+    }
+    return indexes;
+  }, [transactions]);
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["faturas"] });
+  const markPaid = useMutation({
+    mutationFn: (cycleKey: string) =>
+      markFaturaPaid({ data: { account_id: accountId, cycle_key: cycleKey } }),
+    onSuccess: refresh,
+  });
+  const unmarkPaid = useMutation({
+    mutationFn: (cycleKey: string) =>
+      unmarkFaturaPaid({ data: { account_id: accountId, cycle_key: cycleKey } }),
+    onSuccess: refresh,
+  });
+
+  if (!faturasPending && !cycles.length) {
+    return (
+      <main className="page-wrap rise-in py-6 sm:py-10">
+        <Link to="/faturas" className="mb-6 inline-flex items-center gap-2 font-medium">
+          <ArrowLeft className="size-4" /> Voltar para faturas
+        </Link>
+        <Card>
+          <CardContent className="p-6">Cartão não encontrado.</CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  return (
+    <main className="page-wrap rise-in py-6 sm:py-10">
+      <Link to="/faturas" className="mb-6 inline-flex items-center gap-2 font-medium">
+        <ArrowLeft className="size-4" /> Voltar para faturas
+      </Link>
+      <Card className="mb-6">
+        <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-2">
+            <CardTitle>{selected?.accountName ?? "Fatura"}</CardTitle>
+            {selected && (
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-2xl font-bold sm:text-3xl">
+                  {money(selected.total)}
+                </span>
+                <Badge variant={statusVariant[selected.status]}>
+                  {statusLabel[selected.status]}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  vencimento {selected.vencimento}
+                </span>
+              </div>
+            )}
+          </div>
+          {selected &&
+            (selected.status === "paid" ? (
+              <Button
+                variant="outline"
+                disabled={unmarkPaid.isPending}
+                onClick={() => unmarkPaid.mutate(selected.cycleKey)}
+              >
+                Desmarcar paga
+              </Button>
+            ) : (
+              <Button
+                disabled={markPaid.isPending}
+                onClick={() => markPaid.mutate(selected.cycleKey)}
+              >
+                Marcar como paga
+              </Button>
+            ))}
+        </CardHeader>
+      </Card>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-center gap-4">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Fatura anterior"
+              disabled={cycleIdx >= cycles.length - 1}
+              onClick={() => setCycleIdx((index) => index + 1)}
+            >
+              <ChevronLeft />
+            </Button>
+            <CardTitle className="min-w-0 flex-1 text-center normal-case sm:min-w-40 sm:flex-none">
+              {selected ? selected.label : "Carregando…"}
+            </CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Próxima fatura"
+              disabled={cycleIdx <= 0}
+              onClick={() => setCycleIdx((index) => index - 1)}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead>Parcela</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {expenses.map((expense) => (
+                <TableRow key={expense.id}>
+                  <TableCell>{expense.date}</TableCell>
+                  <TableCell>{expense.note || "—"}</TableCell>
+                  <TableCell className="text-destructive">−{money(expense.amount)}</TableCell>
+                  <TableCell>
+                    {expense.categoryId
+                      ? categoryNames.get(expense.categoryId) ?? "—"
+                      : "—"}
+                  </TableCell>
+                  <TableCell>
+                    {expense.installmentPlanId ? (
+                      <Badge variant="outline">
+                        {installmentIndexes.get(expense.id)}/
+                        {planCounts.get(expense.installmentPlanId)}
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!expenses.length && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    Nenhuma despesa nesta fatura.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}

@@ -23,3 +23,17 @@ export function balanceOf(
 ): number {
   return rows.reduce((acc, r) => acc + signedAmount(r.type, r.amount), 0)
 }
+
+/** Prepaid card balance: earns + incoming transfers − expends − outgoing transfers, for one account. */
+export function prepaidBalanceOf(
+  accountId: string,
+  rows: Array<{ type: 'earn' | 'expend' | 'transfer'; amount: number; accountId: string | null; counterAccountId: string | null }>,
+): number {
+  return rows.reduce((acc, r) => {
+    if (r.type === 'earn' && r.accountId === accountId) return acc + r.amount
+    if (r.type === 'expend' && r.accountId === accountId) return acc - r.amount
+    if (r.type === 'transfer' && r.counterAccountId === accountId) return acc + r.amount
+    if (r.type === 'transfer' && r.accountId === accountId) return acc - r.amount
+    return acc
+  }, 0)
+}

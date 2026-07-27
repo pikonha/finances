@@ -17,6 +17,8 @@ export const Route = createFileRoute('/api/transactions')({
         if (!checkBearer(request, 'HERMES_WEBHOOK_SECRET')) {
           return new Response('Unauthorized', { status: 401 })
         }
+        const userId = process.env.HERMES_USER_ID
+        if (!userId) return json({ error: 'HERMES_USER_ID is not configured' }, { status: 500 })
         let body: unknown
         try {
           body = await request.json()
@@ -31,7 +33,7 @@ export const Route = createFileRoute('/api/transactions')({
           )
         }
         try {
-          const result = await createTransactionCore(parsed.data)
+          const result = await createTransactionCore(userId, parsed.data)
           return json(result, { status: 201 })
         } catch (e) {
           const err = e as Error & { cause?: unknown }

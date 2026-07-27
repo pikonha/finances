@@ -1,6 +1,6 @@
 import { eq, lte } from 'drizzle-orm'
 import { db } from '#/db/index'
-import { recurrenceRule, transaction, USER_ID } from '#/db/schema'
+import { recurrenceRule, transaction } from '#/db/schema'
 import { advance, periodKey } from '#/lib/recurrence'
 
 /**
@@ -23,7 +23,7 @@ export async function materializeDueRules(today: string) {
       const res = await db
         .insert(transaction)
         .values({
-          userId: USER_ID,
+          userId: rule.userId,
           type: rule.type,
           amount: rule.amount,
           date: next,

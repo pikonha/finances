@@ -191,3 +191,21 @@ The `cron` service has `CRON_SECRET` + `APP_URL` vars but the schedule/command m
 - **Server-only code must not leak into the client bundle.** A `#/server/*` module that the client imports (for its server functions) must contain *only* `createServerFn` definitions — the bundler strips their handlers (and `#/db`/pg) from the client. A **plain exported function that touches `db`** in such a module drags pg + `Buffer` into the browser → `ReferenceError: Buffer is not defined` at runtime. Keep those plain helpers in `*.core.ts` modules imported only by API routes / server-fn handlers (see `transactions.core.ts`, `recurrence.core.ts`). Guard: `ls .output/public/assets/db-*.js` after build must be empty.
 - vitest needs the standalone config (above).
 - Monthly recurrence uses JS month math — Jan 31 +1mo overflows to Mar 3 (`ponytail:` note in `recurrence.ts`); add end-of-month clamping if it matters.
+
+
+<claude-mem-context>
+# Memory Context
+
+# [santo-domingo] recent context, 2026-07-11 7:32pm GMT-3
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 1 obs (197t read) | 8,806t work | 98% savings
+
+### Jul 11, 2026
+1772 6:49p 🔵 Financial Planning Project Initialized in Santo Domingo Workspace
+
+Access 9k tokens of past work via get_observations([IDs]) or mem-search skill.
+</claude-mem-context>

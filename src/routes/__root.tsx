@@ -2,73 +2,70 @@ import {
   HeadContent,
   Scripts,
   createRootRouteWithContext,
-} from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
-import Footer from '../components/Footer'
-import Header from '../components/Header'
-
-import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
-
-import appCss from '../styles.css?url'
-
-import type { QueryClient } from '@tanstack/react-query'
-
-interface MyRouterContext {
-  queryClient: QueryClient
+  Outlet,
+} from "@tanstack/react-router";
+import type { QueryClient } from "@tanstack/react-query";
+import Footer from "../components/Footer";
+import Header from "../components/Header";
+import { getSessionFn } from "#/server/session";
+import appCss from "../styles.css?url";
+type Session = Awaited<ReturnType<typeof getSessionFn>>;
+export interface RouterContext {
+  queryClient: QueryClient;
+  session?: Session;
 }
+const THEME_INIT_SCRIPT = `(function(){try{var m=localStorage.getItem('theme')||'auto';var d=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'}catch(e){}})()`;
+const SERVICE_WORKER_SCRIPT = `if('serviceWorker'in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(error){console.error('Service worker registration failed:',error)})})}`;
 
-const THEME_INIT_SCRIPT = `(function(){try{var stored=window.localStorage.getItem('theme');var mode=(stored==='light'||stored==='dark'||stored==='auto')?stored:'auto';var prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;var resolved=mode==='auto'?(prefersDark?'dark':'light'):mode;var root=document.documentElement;root.classList.remove('light','dark');root.classList.add(resolved);if(mode==='auto'){root.removeAttribute('data-theme')}else{root.setAttribute('data-theme',mode)}root.style.colorScheme=resolved;}catch(e){}})();`
-
-export const Route = createRootRouteWithContext<MyRouterContext>()({
+export const Route = createRootRouteWithContext<RouterContext>()({
+  beforeLoad: async () => ({ session: await getSessionFn() }),
   head: () => ({
     meta: [
+      { charSet: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: "Finances" },
       {
-        charSet: 'utf-8',
+        name: "description",
+        content: "Controle pessoal de contas, transações, faturas e recorrências.",
       },
+      { name: "theme-color", content: "#ffdb00" },
+      { name: "application-name", content: "Finances" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
       {
-        name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
-      },
-      {
-        title: 'Finances',
+        name: "apple-mobile-web-app-status-bar-style",
+        content: "black-translucent",
       },
     ],
     links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "icon", href: "/icons/icon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
       {
-        rel: 'stylesheet',
-        href: appCss,
+        rel: "apple-touch-icon",
+        href: "/icons/apple-touch-icon-180.png",
       },
     ],
   }),
+  component: Outlet,
   shellComponent: RootDocument,
-})
-
+});
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
-      <body className="font-sans antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
+      <body>
         <Header />
-        {children}
+        <div className="flex-1">{children}</div>
         <Footer />
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-            TanStackQueryDevtools,
-          ]}
-        />
         <Scripts />
+        {import.meta.env.PROD && (
+          <script dangerouslySetInnerHTML={{ __html: SERVICE_WORKER_SCRIPT }} />
+        )}
       </body>
     </html>
-  )
+  );
 }

@@ -1,69 +1,95 @@
-import { Link } from '@tanstack/react-router'
-import ThemeToggle from './ThemeToggle'
+import { Link, useRouter } from "@tanstack/react-router";
+import { LogOut, Menu, WalletCards } from "lucide-react";
+import { authClient } from "#/lib/auth-client";
+import { Button } from "./ui/button";
+import ThemeToggle from "./ThemeToggle";
+
+const NAV_LINKS = [
+  { to: "/", label: "Painel" },
+  { to: "/transactions", label: "Transações" },
+  { to: "/accounts", label: "Contas" },
+  { to: "/faturas", label: "Faturas" },
+] as const;
 
 export default function Header() {
+  const router = useRouter();
+  const { data: session } = authClient.useSession();
   return (
-    <header className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--header-bg)] px-4 backdrop-blur-lg">
-      <nav className="page-wrap flex flex-wrap items-center gap-x-3 gap-y-2 py-3 sm:py-4">
-        <h2 className="m-0 flex-shrink-0 text-base font-semibold tracking-tight">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-3 py-1.5 text-sm text-[var(--sea-ink)] no-underline shadow-[0_8px_24px_rgba(30,90,72,0.08)] sm:px-4 sm:py-2"
-          >
-            <span className="h-2 w-2 rounded-full bg-[linear-gradient(90deg,#56c6be,#7ed3bf)]" />
-            Finances
-          </Link>
-        </h2>
-
-        <div className="order-3 flex w-full flex-wrap items-center gap-x-4 gap-y-1 pb-1 text-sm font-semibold sm:order-none sm:w-auto sm:flex-nowrap sm:pb-0">
-          <Link
-            to="/"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/transactions"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Transactions
-          </Link>
-          <Link
-            to="/cards"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Cards
-          </Link>
-          <Link
-            to="/categories"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Categories
-          </Link>
-          <Link
-            to="/installments"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Installments
-          </Link>
-          <Link
-            to="/recurrence"
-            className="nav-link"
-            activeProps={{ className: 'nav-link is-active' }}
-          >
-            Recurrence
-          </Link>
-        </div>
-
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+    <header className="sticky top-0 z-40 border-b-2 border-foreground bg-background">
+      <nav className="page-wrap flex min-h-14 items-center gap-3 py-2 sm:gap-5">
+        {session?.user && (
+          // ponytail: native <details> is the whole mobile menu — no state, no outside-click listener.
+          <details className="relative sm:hidden">
+            <summary
+              className="flex size-10 cursor-pointer list-none items-center justify-center border-2 border-foreground bg-background [&::-webkit-details-marker]:hidden"
+              aria-label="Abrir menu"
+            >
+              <Menu className="size-5" />
+            </summary>
+            <div
+              className="absolute left-0 top-full z-50 mt-2 flex w-52 flex-col border-2 border-foreground bg-background p-1 brutal-shadow"
+              onClick={(event) =>
+                event.currentTarget
+                  .closest("details")
+                  ?.removeAttribute("open")
+              }
+            >
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className="nav-link px-3 py-3 text-sm"
+                  activeProps={{ className: "nav-link is-active px-3 py-3 text-sm" }}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+        )}
+        <Link
+          to="/"
+          className="display-title flex shrink-0 items-center gap-2 border-2 border-foreground bg-primary px-2 py-1 text-primary-foreground no-underline brutal-shadow"
+        >
+          <WalletCards className="size-5" /> Finances
+        </Link>
+        {session?.user && (
+          <div className="hidden flex-1 items-center gap-4 whitespace-nowrap text-sm font-medium sm:flex">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="nav-link"
+                activeProps={{ className: "nav-link is-active" }}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
           <ThemeToggle />
+          {session?.user && (
+            <>
+              <span className="hidden text-xs text-muted-foreground md:inline">
+                {session.user.email}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Sair"
+                onClick={async () => {
+                  await authClient.signOut();
+                  await router.invalidate();
+                  await router.navigate({ to: "/login" });
+                }}
+              >
+                <LogOut className="size-4" />
+              </Button>
+            </>
+          )}
         </div>
       </nav>
     </header>
-  )
+  );
 }

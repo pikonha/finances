@@ -1,81 +1,47 @@
-import { useEffect, useState } from 'react'
-
-type ThemeMode = 'light' | 'dark' | 'auto'
-
-function getInitialMode(): ThemeMode {
-  if (typeof window === 'undefined') {
-    return 'auto'
-  }
-
-  const stored = window.localStorage.getItem('theme')
-  if (stored === 'light' || stored === 'dark' || stored === 'auto') {
-    return stored
-  }
-
-  return 'auto'
+import { Moon, Sun, SunMoon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "./ui/button";
+type Mode = "light" | "dark" | "auto";
+function apply(mode: Mode) {
+  const resolved =
+    mode === "auto" && matchMedia("(prefers-color-scheme:dark)").matches
+      ? "dark"
+      : mode === "auto"
+        ? "light"
+        : mode;
+  document.documentElement.classList.toggle("dark", resolved === "dark");
+  document.documentElement.style.colorScheme = resolved;
 }
-
-function applyThemeMode(mode: ThemeMode) {
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const resolved = mode === 'auto' ? (prefersDark ? 'dark' : 'light') : mode
-
-  document.documentElement.classList.remove('light', 'dark')
-  document.documentElement.classList.add(resolved)
-
-  if (mode === 'auto') {
-    document.documentElement.removeAttribute('data-theme')
-  } else {
-    document.documentElement.setAttribute('data-theme', mode)
-  }
-
-  document.documentElement.style.colorScheme = resolved
-}
-
 export default function ThemeToggle() {
-  const [mode, setMode] = useState<ThemeMode>('auto')
-
+  const [mode, setMode] = useState<Mode>("auto");
   useEffect(() => {
-    const initialMode = getInitialMode()
-    setMode(initialMode)
-    applyThemeMode(initialMode)
-  }, [])
-
+    const saved = localStorage.getItem("theme");
+    const initial = saved === "light" || saved === "dark" ? saved : "auto";
+    setMode(initial);
+    apply(initial);
+  }, []);
   useEffect(() => {
-    if (mode !== 'auto') {
-      return
-    }
-
-    const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = () => applyThemeMode('auto')
-
-    media.addEventListener('change', onChange)
-    return () => {
-      media.removeEventListener('change', onChange)
-    }
-  }, [mode])
-
-  function toggleMode() {
-    const nextMode: ThemeMode =
-      mode === 'light' ? 'dark' : mode === 'dark' ? 'auto' : 'light'
-    setMode(nextMode)
-    applyThemeMode(nextMode)
-    window.localStorage.setItem('theme', nextMode)
-  }
-
-  const label =
-    mode === 'auto'
-      ? 'Theme mode: auto (system). Click to switch to light mode.'
-      : `Theme mode: ${mode}. Click to switch mode.`
-
+    if (mode !== "auto") return;
+    const media = matchMedia("(prefers-color-scheme:dark)");
+    const fn = () => apply("auto");
+    media.addEventListener("change", fn);
+    return () => media.removeEventListener("change", fn);
+  }, [mode]);
+  const Icon = mode === "light" ? Sun : mode === "dark" ? Moon : SunMoon;
   return (
-    <button
-      type="button"
-      onClick={toggleMode}
-      aria-label={label}
-      title={label}
-      className="rounded-full border border-[var(--chip-line)] bg-[var(--chip-bg)] px-3 py-1.5 text-sm font-semibold text-[var(--sea-ink)] shadow-[0_8px_22px_rgba(30,90,72,0.08)] transition hover:-translate-y-0.5"
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label={`Tema: ${mode === "light" ? "claro" : mode === "dark" ? "escuro" : "automático"}`}
+      onClick={() => {
+        const next =
+          mode === "light" ? "dark" : mode === "dark" ? "auto" : "light";
+        setMode(next);
+        localStorage.setItem("theme", next);
+        apply(next);
+      }}
     >
-      {mode === 'auto' ? 'Auto' : mode === 'dark' ? 'Dark' : 'Light'}
-    </button>
-  )
+      <Icon className="size-4" />
+    </Button>
+  );
 }

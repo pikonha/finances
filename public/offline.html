@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffdb00" />
+    <title>Sem conexão · Finances</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        background: #f4f1e9;
+        color: #0a0a0a;
+      }
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+        background-image:
+          linear-gradient(rgb(10 10 10 / 3%) 1px, transparent 1px),
+          linear-gradient(90deg, rgb(10 10 10 / 3%) 1px, transparent 1px);
+        background-size: 32px 32px;
+      }
+      main {
+        width: min(30rem, calc(100% - 3rem));
+        border: 3px solid currentColor;
+        padding: 2rem;
+        background: white;
+        box-shadow: 8px 8px 0 #0a0a0a;
+      }
+      h1 {
+        margin: 0 0 1rem;
+        font-size: clamp(2rem, 8vw, 3rem);
+        text-transform: uppercase;
+      }
+      p { line-height: 1.6; }
+      button {
+        border: 3px solid #0a0a0a;
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        background: #ffdb00;
+        color: #0a0a0a;
+        font: inherit;
+        font-weight: 800;
+        text-transform: uppercase;
+        box-shadow: 4px 4px 0 #0a0a0a;
+        cursor: pointer;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { background: #0e1014; color: #f2efe6; }
+        body { background-image: none; }
+        main { background: #1a1d24; box-shadow: 8px 8px 0 #050609; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sem conexão</h1>
+      <p>
+        O Finances precisa de internet para carregar seus dados. Por segurança,
+        informações financeiras não ficam armazenadas no cache offline.
+      </p>
+      <button type="button" onclick="location.reload()">Tentar novamente</button>
+    </main>
+  </body>
+</html>

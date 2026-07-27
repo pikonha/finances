@@ -1,0 +1,224 @@
+import { useState } from "react";
+import { ArrowRightLeft } from "lucide-react";
+import type { TransferInput } from "#/server/schemas";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import {
+  EMPTY_SELECT_VALUE,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+
+type AccountOption = {
+  id: string;
+  name: string;
+};
+
+type TransferModalProps = {
+  accounts: AccountOption[];
+  onTransfer: (data: TransferInput) => Promise<void>;
+  compact?: boolean;
+};
+
+export function TransferModal({
+  accounts,
+  onTransfer,
+  compact = false,
+}: TransferModalProps) {
+  const [open, setOpen] = useState(false);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [amount, setAmount] = useState("");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const reset = () => {
+    setFrom("");
+    setTo("");
+    setAmount("");
+    setDate(new Date().toISOString().slice(0, 10));
+    setError("");
+  };
+
+  const changeOpen = (nextOpen: boolean) => {
+    if (isSaving) return;
+    setOpen(nextOpen);
+    if (!nextOpen) reset();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={changeOpen}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size={compact ? "icon" : "default"}
+          className={compact ? "rounded-full" : undefined}
+          aria-label={compact ? "Transferir dinheiro" : undefined}
+        >
+          <ArrowRightLeft className={compact ? "size-5" : "size-4"} />
+          {!compact && "Transferir"}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Transferir entre contas</DialogTitle>
+          <DialogDescription>
+            Movimente dinheiro sem alterar seu saldo total.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="space-y-4"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const dollars = Number(amount);
+            if (!dollars || dollars <= 0 || !from || !to) return;
+
+            setIsSaving(true);
+            setError("");
+            try {
+              await onTransfer({
+                amount: Math.round(dollars * 100),
+                date,
+                account_id: from,
+                counter_account_id: to,
+              });
+              setOpen(false);
+              reset();
+            } catch (cause) {
+              setError(
+                cause instanceof Error
+                  ? cause.message
+                  : "Não foi possível concluir a transferência"
+              );
+            } finally {
+              setIsSaving(false);
+            }
+          }}
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="De" htmlFor="transfer-from">
+              <Select
+                value={from || EMPTY_SELECT_VALUE}
+                onValueChange={(value) => {
+                  const accountId =
+                    value === EMPTY_SELECT_VALUE ? "" : value;
+                  setFrom(accountId);
+                  if (to === accountId) setTo("");
+                }}
+                required
+              >
+                <SelectTrigger id="transfer-from" autoFocus>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY_SELECT_VALUE}>
+                    Selecione…
+                  </SelectItem>
+                {accounts.map((account) => (
+                  <SelectItem key={account.id} value={account.id}>
+                    {account.name}
+                  </SelectItem>
+                ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Para" htmlFor="transfer-to">
+              <Select
+                value={to || EMPTY_SELECT_VALUE}
+                onValueChange={(value) =>
+                  setTo(value === EMPTY_SELECT_VALUE ? "" : value)
+                }
+                required
+              >
+                <SelectTrigger id="transfer-to">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY_SELECT_VALUE}>
+                    Selecione…
+                  </SelectItem>
+                {accounts.map((account) => (
+                  <SelectItem
+                    key={account.id}
+                    value={account.id}
+                    disabled={account.id === from}
+                  >
+                    {account.name}
+                  </SelectItem>
+                ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Valor (R$)" htmlFor="transfer-amount">
+              <Input
+                id="transfer-amount"
+                type="number"
+                min=".01"
+                step=".01"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                required
+              />
+            </Field>
+            <Field label="Data" htmlFor="transfer-date">
+              <Input
+                id="transfer-date"
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
+                required
+              />
+            </Field>
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" disabled={isSaving}>
+                Cancelar
+              </Button>
+            </DialogClose>
+            <Button disabled={isSaving}>
+              {isSaving ? "Transferindo…" : "Transferir"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+    </div>
+  );
+}
