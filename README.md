@@ -45,6 +45,13 @@ CRON_SECRET=...
 - `pnpm db:seed` — reset deterministic demo data in a local database
 - `pnpm start` — run `.output/server/index.mjs`
 
+## PWA
+
+Production builds are installable on desktop, Android, and iOS. The service worker
+caches only versioned UI assets. Authenticated pages, API responses, and financial
+data are always network-only; offline navigation shows a privacy-safe fallback.
+Service-worker registration is intentionally disabled in development.
+
 ## Railway
 
 Set all six environment variables above; use the public app URL for `BETTER_AUTH_URL`. Apply the migration before deploying. The database migration is destructive versus the old single-user/card schema.

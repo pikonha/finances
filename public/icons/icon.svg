@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Finances">
+  <rect width="512" height="512" fill="#ffdb00"/>
+  <rect x="92" y="126" width="328" height="260" rx="30" fill="#fff" stroke="#0a0a0a" stroke-width="24"/>
+  <path d="M104 194h304" stroke="#0a0a0a" stroke-width="24"/>
+  <path d="M318 238h102v94H318c-30 0-54-21-54-47s24-47 54-47Z" fill="#00e0c6" stroke="#0a0a0a" stroke-width="24"/>
+  <circle cx="321" cy="285" r="12" fill="#0a0a0a"/>
+  <path d="M138 126v-18c0-22 18-40 40-40h188c22 0 40 18 40 40v18" fill="none" stroke="#0a0a0a" stroke-width="24"/>
+</svg>
