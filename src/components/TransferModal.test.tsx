@@ -26,12 +26,15 @@ describe("TransferModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Transferir" }));
 
     const dialog = screen.getByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText("De"), {
-      target: { value: accounts[0].id },
-    });
-    fireEvent.change(within(dialog).getByLabelText("Para"), {
-      target: { value: accounts[1].id },
-    });
+    fireEvent.click(within(dialog).getByLabelText("De"));
+    fireEvent.click(screen.getByRole("option", { name: "Checking" }));
+    fireEvent.click(within(dialog).getByLabelText("Para"));
+    expect(
+      screen.getByRole("option", { name: "Checking" }).getAttribute(
+        "aria-disabled"
+      )
+    ).toBe("true");
+    fireEvent.click(screen.getByRole("option", { name: "Savings" }));
     fireEvent.change(within(dialog).getByLabelText("Valor (R$)"), {
       target: { value: "12.34" },
     });

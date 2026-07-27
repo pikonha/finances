@@ -9,8 +9,16 @@ import { prepaidBalanceOf } from "#/lib/money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 export const Route = createFileRoute("/_authed/accounts")({
   component: Accounts,
 });
@@ -61,8 +69,10 @@ function Accounts() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
   });
   return (
-    <main className="page-wrap rise-in py-10">
-      <h1 className="display-title mb-6 text-4xl font-bold">Contas</h1>
+    <main className="page-wrap rise-in py-6 sm:py-10">
+      <h1 className="display-title mb-6 text-3xl font-bold sm:text-4xl">
+        Contas
+      </h1>
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Adicionar conta</CardTitle>
@@ -100,25 +110,35 @@ function Accounts() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Tipo</Label>
-              <select
-                className="h-9 w-full rounded-md border bg-transparent px-3 text-sm"
+              <Label htmlFor="account-kind">Tipo</Label>
+              <Select
                 value={kind}
-                onChange={(e) => setKind(e.target.value as typeof kind)}
+                onValueChange={(value) => setKind(value as typeof kind)}
               >
-                <option value="bank_account">Conta bancária</option>
-                <option value="credit_card">Cartão de crédito</option>
-              </select>
+                <SelectTrigger id="account-kind">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_account">Conta bancária</SelectItem>
+                  <SelectItem value="credit_card">
+                    Cartão de crédito
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {kind === "credit_card" && (
-              <div className="flex items-end gap-2">
-                <input
-                  id="prepaid"
-                  type="checkbox"
-                  checked={prepaid}
-                  onChange={(e) => setPrepaid(e.target.checked)}
-                />
-                <Label htmlFor="prepaid">Cartão pré-pago</Label>
+              <div className="flex items-end">
+                <Label
+                  htmlFor="prepaid"
+                  className="flex min-h-10 cursor-pointer items-center gap-3 uppercase"
+                >
+                  <Checkbox
+                    id="prepaid"
+                    checked={prepaid}
+                    onChange={(e) => setPrepaid(e.target.checked)}
+                  />
+                  Cartão pré-pago
+                </Label>
               </div>
             )}
             {kind === "credit_card" && !prepaid && (
@@ -159,7 +179,9 @@ function Accounts() {
                 />
               </div>
             )}
-            <Button className="sm:col-span-3 sm:w-fit">Adicionar conta</Button>
+            <Button className="w-full sm:col-span-3 sm:w-fit">
+              Adicionar conta
+            </Button>
             {create.error && (
               <p className="text-sm text-destructive sm:col-span-3">
                 {create.error.message}
@@ -178,7 +200,7 @@ function Accounts() {
             return (
               <div
                 key={a.id}
-                className="flex items-center gap-3 rounded-lg border p-3"
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 border-2 border-foreground bg-card p-3"
               >
                 <span className="font-medium">{a.name}</span>
                 <Badge variant="secondary">{kindLabel(a.kind)}</Badge>

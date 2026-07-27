@@ -26,6 +26,11 @@ const accounts = [
 describe("TransactionModal", () => {
   it("opens on demand and submits integer cents", async () => {
     const onCreate = vi.fn().mockResolvedValue(undefined);
+    const initialDate = [
+      new Date().getFullYear(),
+      String(new Date().getMonth() + 1).padStart(2, "0"),
+      String(new Date().getDate()).padStart(2, "0"),
+    ].join("-");
     render(
       <TransactionModal
         type="earn"
@@ -40,20 +45,25 @@ describe("TransactionModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Adicionar receita" }));
 
     const dialog = screen.getByRole("dialog");
+    // Themed tokens, not hardcoded white/black — the modal has to work in dark mode.
+    expect(dialog.classList.contains("bg-background")).toBe(true);
+    expect(dialog.classList.contains("bg-white")).toBe(false);
+    expect(within(dialog).getByLabelText("Repetir").textContent).toContain(
+      "Não repetir"
+    );
     fireEvent.change(within(dialog).getByLabelText("Valor (R$)"), {
       target: { value: "12.34" },
     });
-    fireEvent.change(within(dialog).getByLabelText("Data"), {
-      target: { value: "2026-07-19" },
-    });
-    fireEvent.change(within(dialog).getByLabelText("Categoria"), {
-      target: { value: categories[0].id },
-    });
-    fireEvent.change(within(dialog).getByLabelText("Conta"), {
-      target: { value: accounts[0].id },
-    });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Nota" }));
-    fireEvent.change(within(dialog).getByLabelText("Nota"), {
+    expect(within(dialog).getByLabelText("Data").tagName).toBe("BUTTON");
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Categoria: Nenhuma" })
+    );
+    fireEvent.click(within(dialog).getByRole("option", { name: "Groceries" }));
+    fireEvent.click(within(dialog).getByLabelText("Conta"));
+    fireEvent.click(
+      screen.getByRole("option", { name: "Checking · conta bancária" })
+    );
+    fireEvent.change(within(dialog).getByLabelText("Nome"), {
       target: { value: "Paycheck" },
     });
     fireEvent.click(
@@ -64,7 +74,7 @@ describe("TransactionModal", () => {
       expect(onCreate).toHaveBeenCalledWith({
         type: "earn",
         amount: 1234,
-        date: "2026-07-19",
+        date: initialDate,
         category_id: categories[0].id,
         account_id: accounts[0].id,
         note: "Paycheck",
@@ -73,6 +83,42 @@ describe("TransactionModal", () => {
       })
     );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("shows the selected repeat option and submits recurrence", async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <TransactionModal
+        type="earn"
+        accounts={accounts}
+        categories={categories}
+        onCreate={onCreate}
+        onCreateCategory={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar receita" }));
+    const dialog = screen.getByRole("dialog");
+    const repeatSelect = within(dialog).getByLabelText("Repetir");
+    fireEvent.click(repeatSelect);
+    fireEvent.click(screen.getByRole("option", { name: "Mensal" }));
+    expect(repeatSelect.textContent).toContain("Mensal");
+
+    fireEvent.change(within(dialog).getByLabelText("Valor (R$)"), {
+      target: { value: "10" },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Adicionar transação" })
+    );
+
+    await waitFor(() =>
+      expect(onCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recurrence: { interval: "monthly" },
+          installments: undefined,
+        })
+      )
+    );
   });
 
   it("keeps the modal open and shows server errors", async () => {

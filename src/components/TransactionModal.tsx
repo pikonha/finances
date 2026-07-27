@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Minus, Plus, Repeat, StickyNote } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import type { CreateTransactionInput } from "#/server/schemas";
 import { CategorySelect } from "./CategorySelect";
 import { Button } from "./ui/button";
@@ -14,8 +14,18 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import {
+  EMPTY_SELECT_VALUE,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { DatePicker, localDateKey } from "./ui/date-picker";
 
 type RepeatInterval =
+  | "none"
   | "daily"
   | "weekly"
   | "monthly"
@@ -32,7 +42,7 @@ type TransactionModalProps = {
   onCreateCategory: (name: string) => Promise<string>;
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDateKey();
 
 export function TransactionModal({
   type,
@@ -47,9 +57,7 @@ export function TransactionModal({
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
-  const [showNote, setShowNote] = useState(false);
-  const [showRepeat, setShowRepeat] = useState(false);
-  const [repeat, setRepeat] = useState<RepeatInterval>("monthly");
+  const [repeat, setRepeat] = useState<RepeatInterval>("none");
   const [count, setCount] = useState("2");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -67,9 +75,7 @@ export function TransactionModal({
     setCategoryId("");
     setAccountId("");
     setNote("");
-    setShowNote(false);
-    setShowRepeat(false);
-    setRepeat("monthly");
+    setRepeat("none");
     setCount("2");
     setError("");
   };
@@ -99,7 +105,7 @@ export function TransactionModal({
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {type === "earn" ? "Adicionar receita" : "Adicionar despesa"}
@@ -125,13 +131,13 @@ export function TransactionModal({
                 date,
                 category_id: categoryId || undefined,
                 account_id: accountId || undefined,
-                note: showNote && note ? note : undefined,
+                note: note || undefined,
                 recurrence:
-                  showRepeat && repeat !== "installments"
+                  repeat !== "none" && repeat !== "installments"
                     ? { interval: repeat }
                     : undefined,
                 installments:
-                  showRepeat && repeat === "installments"
+                  repeat === "installments"
                     ? { count: Number(count) }
                     : undefined,
               });
@@ -149,6 +155,14 @@ export function TransactionModal({
           }}
         >
           <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Nome" htmlFor="transaction-note">
+              <Input
+                id="transaction-note"
+                value={note}
+                maxLength={500}
+                onChange={(event) => setNote(event.target.value)}
+              />
+            </Field>
             <Field label="Valor (R$)" htmlFor="transaction-amount">
               <Input
                 id="transaction-amount"
@@ -162,33 +176,37 @@ export function TransactionModal({
               />
             </Field>
             <Field label="Data" htmlFor="transaction-date">
-              <Input
+              <DatePicker
                 id="transaction-date"
-                type="date"
                 value={date}
-                onChange={(event) => setDate(event.target.value)}
+                onChange={setDate}
                 required
               />
             </Field>
             <Field label="Conta" htmlFor="transaction-account">
-              <select
-                id="transaction-account"
-                className="control"
-                value={accountId}
-                onChange={(event) => setAccountId(event.target.value)}
+              <Select
+                value={accountId || EMPTY_SELECT_VALUE}
+                onValueChange={(value) =>
+                  setAccountId(value === EMPTY_SELECT_VALUE ? "" : value)
+                }
               >
-                <option value="">Nenhuma</option>
+                <SelectTrigger id="transaction-account">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY_SELECT_VALUE}>Nenhuma</SelectItem>
                 {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
+                  <SelectItem key={account.id} value={account.id}>
                     {account.name} ·{" "}
                     {account.kind === "credit_card"
                       ? "cartão de crédito"
                       : "conta bancária"}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+                </SelectContent>
+              </Select>
             </Field>
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
               <Label>Categoria</Label>
               <CategorySelect
                 categories={categories}
@@ -198,81 +216,52 @@ export function TransactionModal({
               />
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button
-              type="button"
-              variant={showRepeat ? "default" : "outline"}
-              onClick={() => setShowRepeat((value) => !value)}
-            >
-              <Repeat className="size-4" />
-              Repetir
-            </Button>
-            <Button
-              type="button"
-              variant={showNote ? "default" : "outline"}
-              onClick={() => {
-                setShowNote((value) => !value);
-                if (showNote) setNote("");
-              }}
-            >
-              <StickyNote className="size-4" />
-              Nota
-            </Button>
-          </div>
-          {showRepeat && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Repetir" htmlFor="transaction-repeat">
-                <select
-                  id="transaction-repeat"
-                  className="control"
-                  value={repeat}
-                  onChange={(event) =>
-                    setRepeat(event.target.value as RepeatInterval)
-                  }
-                >
-                  <option value="daily">Diária</option>
-                  <option value="weekly">Semanal</option>
-                  <option value="monthly">Mensal</option>
-                  <option value="yearly">Anual</option>
-                  <option value="installments" disabled={!canInstall}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Repetir" htmlFor="transaction-repeat">
+              <Select
+                value={repeat}
+                onValueChange={(value) =>
+                  setRepeat(value as RepeatInterval)
+                }
+              >
+                <SelectTrigger id="transaction-repeat">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Não repetir</SelectItem>
+                  <SelectItem value="daily">Diária</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                  <SelectItem value="yearly">Anual</SelectItem>
+                  <SelectItem value="installments" disabled={!canInstall}>
                     Parcelado…
-                  </option>
-                </select>
-              </Field>
-              {repeat === "installments" && (
-                <Field
-                  label="Número de parcelas"
-                  htmlFor="transaction-installments"
-                >
-                  <Input
-                    id="transaction-installments"
-                    type="number"
-                    min="2"
-                    max="360"
-                    value={count}
-                    onChange={(event) => setCount(event.target.value)}
-                    required
-                  />
-                </Field>
-              )}
-            </div>
-          )}
-          {showNote && (
-            <Field label="Nota" htmlFor="transaction-note">
-              <Input
-                id="transaction-note"
-                value={note}
-                maxLength={500}
-                onChange={(event) => setNote(event.target.value)}
-              />
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
-          )}
+            {repeat === "installments" && (
+              <Field
+                label="Número de parcelas"
+                htmlFor="transaction-installments"
+              >
+                <Input
+                  id="transaction-installments"
+                  type="number"
+                  min="2"
+                  max="360"
+                  value={count}
+                  onChange={(event) => setCount(event.target.value)}
+                  required
+                />
+              </Field>
+            )}
+          </div>
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
             </p>
           )}
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <DialogClose asChild>
               <Button type="button" variant="ghost" disabled={isSaving}>
                 Cancelar

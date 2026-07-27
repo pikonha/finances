@@ -13,6 +13,14 @@ import {
 } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import {
+  EMPTY_SELECT_VALUE,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 
 type AccountOption = {
   id: string;
@@ -104,44 +112,57 @@ export function TransferModal({
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="De" htmlFor="transfer-from">
-              <select
-                id="transfer-from"
-                className="control"
-                value={from}
-                onChange={(event) => {
-                  setFrom(event.target.value);
-                  if (to === event.target.value) setTo("");
+              <Select
+                value={from || EMPTY_SELECT_VALUE}
+                onValueChange={(value) => {
+                  const accountId =
+                    value === EMPTY_SELECT_VALUE ? "" : value;
+                  setFrom(accountId);
+                  if (to === accountId) setTo("");
                 }}
                 required
-                autoFocus
               >
-                <option value="">Selecione…</option>
+                <SelectTrigger id="transfer-from" autoFocus>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY_SELECT_VALUE}>
+                    Selecione…
+                  </SelectItem>
                 {accounts.map((account) => (
-                  <option key={account.id} value={account.id}>
+                  <SelectItem key={account.id} value={account.id}>
                     {account.name}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Para" htmlFor="transfer-to">
-              <select
-                id="transfer-to"
-                className="control"
-                value={to}
-                onChange={(event) => setTo(event.target.value)}
+              <Select
+                value={to || EMPTY_SELECT_VALUE}
+                onValueChange={(value) =>
+                  setTo(value === EMPTY_SELECT_VALUE ? "" : value)
+                }
                 required
               >
-                <option value="">Selecione…</option>
+                <SelectTrigger id="transfer-to">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY_SELECT_VALUE}>
+                    Selecione…
+                  </SelectItem>
                 {accounts.map((account) => (
-                  <option
+                  <SelectItem
                     key={account.id}
                     value={account.id}
                     disabled={account.id === from}
                   >
                     {account.name}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Valor (R$)" htmlFor="transfer-amount">
               <Input
@@ -169,7 +190,7 @@ export function TransferModal({
               {error}
             </p>
           )}
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <DialogClose asChild>
               <Button type="button" variant="ghost" disabled={isSaving}>
                 Cancelar

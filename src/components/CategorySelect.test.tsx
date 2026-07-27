@@ -12,7 +12,33 @@ import { CategorySelect } from "./CategorySelect";
 afterEach(cleanup);
 
 describe("CategorySelect", () => {
-  it("creates and selects a category from the dropdown", async () => {
+  it("filters and selects an existing category", () => {
+    const onChange = vi.fn();
+    render(
+      <CategorySelect
+        categories={[
+          { id: "groceries-id", name: "Groceries" },
+          { id: "travel-id", name: "Travel" },
+        ]}
+        value=""
+        onChange={onChange}
+        onCreate={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Categoria: Nenhuma" }));
+    fireEvent.change(screen.getByLabelText("Buscar ou criar categoria"), {
+      target: { value: "trav" },
+    });
+
+    expect(screen.queryByRole("option", { name: "Groceries" })).toBeNull();
+    fireEvent.click(screen.getByRole("option", { name: "Travel" }));
+
+    expect(onChange).toHaveBeenCalledWith("travel-id");
+    expect(screen.queryByLabelText("Buscar ou criar categoria")).toBeNull();
+  });
+
+  it("creates and selects a category inside the dropdown", async () => {
     const onChange = vi.fn();
     const onCreate = vi.fn().mockResolvedValue("new-id");
     render(
@@ -24,20 +50,64 @@ describe("CategorySelect", () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText("Categoria"), {
-      target: { value: "__create_category__" },
-    });
-    fireEvent.change(screen.getByLabelText("Nome da nova categoria"), {
+    fireEvent.click(screen.getByRole("button", { name: "Categoria: Nenhuma" }));
+    fireEvent.change(screen.getByLabelText("Buscar ou criar categoria"), {
       target: { value: "  Travel  " },
     });
-    fireEvent.click(screen.getByLabelText("Criar categoria"));
+    fireEvent.click(screen.getByRole("button", { name: "Criar “Travel”" }));
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledWith("Travel"));
     expect(onChange).toHaveBeenCalledWith("new-id");
-    expect(screen.queryByLabelText("Nome da nova categoria")).toBeNull();
+    expect(screen.queryByLabelText("Buscar ou criar categoria")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Categoria: Nenhuma" }));
+    expect(screen.getByRole("option", { name: "Travel" })).toBeTruthy();
   });
 
-  it("cancels category creation without changing the selection", () => {
+  it("selects an exact match on Enter instead of creating a duplicate", () => {
+    const onChange = vi.fn();
+    const onCreate = vi.fn();
+    render(
+      <CategorySelect
+        categories={[{ id: "travel-id", name: "Travel" }]}
+        value=""
+        onChange={onChange}
+        onCreate={onCreate}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Categoria: Nenhuma" }));
+    const search = screen.getByLabelText("Buscar ou criar categoria");
+    fireEvent.change(search, { target: { value: "travel" } });
+    fireEvent.keyDown(search, { key: "Enter" });
+
+    expect(onCreate).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenCalledWith("travel-id");
+  });
+
+  it("keeps the dropdown open and reports creation failures", async () => {
+    render(
+      <CategorySelect
+        categories={[]}
+        value=""
+        onChange={vi.fn()}
+        onCreate={vi.fn().mockRejectedValue(new Error("Categoria duplicada"))}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Categoria: Nenhuma" }));
+    fireEvent.change(screen.getByLabelText("Buscar ou criar categoria"), {
+      target: { value: "Travel" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Criar “Travel”" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Categoria duplicada"
+    );
+    expect(screen.getByLabelText("Buscar ou criar categoria")).toBeTruthy();
+  });
+
+  it("closes on Escape without changing the selection", () => {
     const onChange = vi.fn();
     render(
       <CategorySelect
@@ -48,12 +118,12 @@ describe("CategorySelect", () => {
       />
     );
 
-    fireEvent.change(screen.getByLabelText("Categoria"), {
-      target: { value: "__create_category__" },
+    fireEvent.click(screen.getByRole("button", { name: "Categoria: Nenhuma" }));
+    fireEvent.keyDown(screen.getByLabelText("Buscar ou criar categoria"), {
+      key: "Escape",
     });
-    fireEvent.click(screen.getByLabelText("Cancelar criação de categoria"));
 
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.queryByLabelText("Nome da nova categoria")).toBeNull();
+    expect(screen.queryByLabelText("Buscar ou criar categoria")).toBeNull();
   });
 });

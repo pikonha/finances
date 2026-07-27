@@ -1,54 +1,73 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { LogOut, WalletCards } from "lucide-react";
+import { LogOut, Menu, WalletCards } from "lucide-react";
 import { authClient } from "#/lib/auth-client";
 import { Button } from "./ui/button";
 import ThemeToggle from "./ThemeToggle";
+
+const NAV_LINKS = [
+  { to: "/", label: "Painel" },
+  { to: "/transactions", label: "Transações" },
+  { to: "/accounts", label: "Contas" },
+  { to: "/faturas", label: "Faturas" },
+] as const;
 
 export default function Header() {
   const router = useRouter();
   const { data: session } = authClient.useSession();
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-lg">
-      <nav className="page-wrap flex min-h-14 flex-wrap items-center gap-5 py-2">
+    <header className="sticky top-0 z-40 border-b-2 border-foreground bg-background">
+      <nav className="page-wrap flex min-h-14 items-center gap-3 py-2 sm:gap-5">
+        {session?.user && (
+          // ponytail: native <details> is the whole mobile menu — no state, no outside-click listener.
+          <details className="relative sm:hidden">
+            <summary
+              className="flex size-10 cursor-pointer list-none items-center justify-center border-2 border-foreground bg-background [&::-webkit-details-marker]:hidden"
+              aria-label="Abrir menu"
+            >
+              <Menu className="size-5" />
+            </summary>
+            <div
+              className="absolute left-0 top-full z-50 mt-2 flex w-52 flex-col border-2 border-foreground bg-background p-1 brutal-shadow"
+              onClick={(event) =>
+                event.currentTarget
+                  .closest("details")
+                  ?.removeAttribute("open")
+              }
+            >
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className="nav-link px-3 py-3 text-sm"
+                  activeProps={{ className: "nav-link is-active px-3 py-3 text-sm" }}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </details>
+        )}
         <Link
           to="/"
-          className="flex items-center gap-2 font-semibold text-foreground no-underline"
+          className="display-title flex shrink-0 items-center gap-2 border-2 border-foreground bg-primary px-2 py-1 text-primary-foreground no-underline brutal-shadow"
         >
-          <WalletCards className="size-5 text-primary" /> Finances
+          <WalletCards className="size-5" /> Finances
         </Link>
         {session?.user && (
-          <div className="flex flex-1 flex-wrap items-center gap-4 text-sm font-medium">
-            <Link
-              to="/"
-              className="nav-link"
-              activeProps={{ className: "nav-link is-active" }}
-            >
-              Painel
-            </Link>
-            <Link
-              to="/transactions"
-              className="nav-link"
-              activeProps={{ className: "nav-link is-active" }}
-            >
-              Transações
-            </Link>
-            <Link
-              to="/accounts"
-              className="nav-link"
-              activeProps={{ className: "nav-link is-active" }}
-            >
-              Contas
-            </Link>
-            <Link
-              to="/faturas"
-              className="nav-link"
-              activeProps={{ className: "nav-link is-active" }}
-            >
-              Faturas
-            </Link>
+          <div className="hidden flex-1 items-center gap-4 whitespace-nowrap text-sm font-medium sm:flex">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="nav-link"
+                activeProps={{ className: "nav-link is-active" }}
+              >
+                {link.label}
+              </Link>
+            ))}
           </div>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
           <ThemeToggle />
           {session?.user && (
             <>

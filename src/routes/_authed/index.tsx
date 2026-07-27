@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { useState } from "react";
 import { listAccounts } from "#/server/accounts";
 import { createCategory, listCategories } from "#/server/categories";
+import { listFaturas } from "#/server/faturas";
 import {
   createTransaction,
   createTransfer,
@@ -10,6 +12,7 @@ import {
 } from "#/server/transactions";
 import type { CreateTransactionInput } from "#/server/schemas";
 import { balanceOf } from "#/lib/money";
+import { DashboardCharts } from "@/components/DashboardCharts";
 import { TransactionModal } from "@/components/TransactionModal";
 import { TransferModal } from "@/components/TransferModal";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,7 @@ function money(cents: number) {
 
 function Dashboard() {
   const queryClient = useQueryClient();
+  const [showValues, setShowValues] = useState(true);
   const { data: transactions = [] } = useQuery({
     queryKey: ["transactions"],
     queryFn: () => listTransactions(),
@@ -37,6 +41,10 @@ function Dashboard() {
   const { data: accounts = [] } = useQuery({
     queryKey: ["accounts"],
     queryFn: () => listAccounts(),
+  });
+  const { data: faturas = [] } = useQuery({
+    queryKey: ["faturas"],
+    queryFn: () => listFaturas(),
   });
   const statsTransactions = transactions.filter(
     (
@@ -59,13 +67,15 @@ function Dashboard() {
   const refreshTransactions = async () => {
     await queryClient.invalidateQueries({ queryKey: ["transactions"] });
   };
+  const displayMoney = (cents: number) =>
+    showValues ? money(cents) : "••••••";
 
   return (
-    <main className="page-wrap rise-in py-10">
-      <div className="mb-7 flex items-end justify-between gap-4">
+    <main className="page-wrap rise-in py-6 sm:py-10">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-primary">Visão geral</p>
-          <h1 className="display-title text-4xl font-bold">
+          <p className="text-sm font-bold text-foreground">Visão geral</p>
+          <h1 className="display-title text-3xl font-bold sm:text-4xl">
             Seu dinheiro, com clareza.
           </h1>
         </div>
@@ -73,6 +83,21 @@ function Dashboard() {
           className="flex items-center gap-2"
           aria-label="Ações de transação"
         >
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setShowValues((current) => !current)}
+            aria-pressed={!showValues}
+            aria-label={showValues ? "Ocultar valores" : "Mostrar valores"}
+            title={showValues ? "Ocultar valores" : "Mostrar valores"}
+          >
+            {showValues ? (
+              <EyeOff className="size-4" />
+            ) : (
+              <Eye className="size-4" />
+            )}
+          </Button>
           <TransactionModal
             type="earn"
             accounts={accounts}
@@ -101,6 +126,12 @@ function Dashboard() {
           />
         </div>
       </div>
+      <DashboardCharts
+        transactions={transactions}
+        categories={categories}
+        faturas={faturas}
+        showValues={showValues}
+      />
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-sm text-muted-foreground">
@@ -108,8 +139,8 @@ function Dashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-4xl font-bold">
-            {money(balanceOf(statsTransactions))}
+          <p className="text-3xl font-bold sm:text-4xl">
+            {displayMoney(balanceOf(statsTransactions))}
           </p>
           <Button asChild className="mt-6">
             <Link to="/transactions">
@@ -126,21 +157,21 @@ function Dashboard() {
           {transactions.slice(0, 10).map((transaction) => (
             <div
               key={transaction.id}
-              className="flex justify-between border-b pb-3 last:border-0"
+              className="flex justify-between gap-3 border-b pb-3 last:border-0"
             >
-              <span>
+              <span className="min-w-0 truncate">
                 {transaction.note ||
                   (transaction.type === "earn" ? "Receita" : "Despesa")}
               </span>
               <span
-                className={
+                className={`shrink-0 ${
                   transaction.type === "earn"
                     ? "text-emerald-600"
                     : "text-destructive"
-                }
+                }`}
               >
                 {transaction.type === "earn" ? "+" : "−"}
-                {money(transaction.amount)}
+                {displayMoney(transaction.amount)}
               </span>
             </div>
           ))}

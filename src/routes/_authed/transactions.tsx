@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Repeat, StickyNote } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { listAccounts } from "#/server/accounts";
 import { createCategory, listCategories } from "#/server/categories";
 import {
@@ -17,8 +17,17 @@ import { TransferModal } from "@/components/TransferModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePicker, localDateKey } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  EMPTY_SELECT_VALUE,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -31,7 +40,13 @@ import {
 export const Route = createFileRoute("/_authed/transactions")({
   component: Transactions,
 });
-type Repeat = "daily" | "weekly" | "monthly" | "yearly" | "installments";
+type Repeat =
+  | "none"
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "yearly"
+  | "installments";
 const money = (c: number) =>
   (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const monthLabel = (key: string) =>
@@ -63,13 +78,11 @@ function Transactions() {
   });
   const [type, setType] = useState<"earn" | "expend">("expend"),
     [amount, setAmount] = useState(""),
-    [date, setDate] = useState(() => new Date().toISOString().slice(0, 10)),
+    [date, setDate] = useState(localDateKey),
     [categoryId, setCategoryId] = useState(""),
     [accountId, setAccountId] = useState(""),
     [note, setNote] = useState(""),
-    [showRepeat, setShowRepeat] = useState(false),
-    [showNote, setShowNote] = useState(false),
-    [repeat, setRepeat] = useState<Repeat>("monthly"),
+    [repeat, setRepeat] = useState<Repeat>("none"),
     [count, setCount] = useState("2");
   const selected = accounts.find((a) => a.id === accountId);
   const canInstall = type === "expend" && selected?.kind === "credit_card";
@@ -86,9 +99,7 @@ function Transactions() {
       refresh();
       setAmount("");
       setNote("");
-      setShowNote(false);
-      setShowRepeat(false);
-      setRepeat("monthly");
+      setRepeat("none");
     },
   });
   const createCategoryMutation = useMutation({
@@ -147,9 +158,11 @@ function Transactions() {
   }, [transactions]);
 
   return (
-    <main className="page-wrap rise-in py-10">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <h1 className="display-title text-4xl font-bold">Transações</h1>
+    <main className="page-wrap rise-in py-6 sm:py-10">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <h1 className="display-title text-3xl font-bold sm:text-4xl">
+          Transações
+        </h1>
         <TransferModal
           accounts={accounts}
           onTransfer={async (data) => {
@@ -175,27 +188,38 @@ function Transactions() {
                 date,
                 category_id: categoryId || undefined,
                 account_id: accountId || undefined,
-                note: showNote && note ? note : undefined,
+                note: note || undefined,
                 recurrence:
-                  showRepeat && repeat !== "installments"
+                  repeat !== "none" && repeat !== "installments"
                     ? { interval: repeat }
                     : undefined,
                 installments:
-                  showRepeat && repeat === "installments"
+                  repeat === "installments"
                     ? { count: Number(count) }
                     : undefined,
               });
             }}
           >
+            <Field label="Nome">
+              <Input
+                value={note}
+                maxLength={500}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </Field>
             <Field label="Tipo">
-              <select
-                className="control"
+              <Select
                 value={type}
-                onChange={(e) => setType(e.target.value as typeof type)}
+                onValueChange={(value) => setType(value as typeof type)}
               >
-                <option value="expend">Despesa</option>
-                <option value="earn">Receita</option>
-              </select>
+                <SelectTrigger aria-label="Tipo">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expend">Despesa</SelectItem>
+                  <SelectItem value="earn">Receita</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Valor (R$)">
               <Input
@@ -207,11 +231,11 @@ function Transactions() {
                 required
               />
             </Field>
-            <Field label="Data">
-              <Input
-                type="date"
+            <Field label="Data" htmlFor="transaction-page-date">
+              <DatePicker
+                id="transaction-page-date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={setDate}
                 required
               />
             </Field>
@@ -226,58 +250,46 @@ function Transactions() {
               />
             </Field>
             <Field label="Conta">
-              <select
-                className="control"
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
+              <Select
+                value={accountId || EMPTY_SELECT_VALUE}
+                onValueChange={(value) =>
+                  setAccountId(value === EMPTY_SELECT_VALUE ? "" : value)
+                }
               >
-                <option value="">Nenhuma</option>
+                <SelectTrigger aria-label="Conta">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY_SELECT_VALUE}>Nenhuma</SelectItem>
                 {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
+                  <SelectItem key={a.id} value={a.id}>
                     {a.name} · {kindLabel(a.kind)}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+                </SelectContent>
+              </Select>
             </Field>
-            <div className="flex items-end gap-3">
-              <Button
-                type="button"
-                variant={showRepeat ? "default" : "outline"}
-                onClick={() => setShowRepeat((v) => !v)}
+            <Field label="Repetir">
+              <Select
+                value={repeat}
+                onValueChange={(value) => setRepeat(value as Repeat)}
               >
-                <Repeat className="size-4" />
-                Repetir
-              </Button>
-              <Button
-                type="button"
-                variant={showNote ? "default" : "outline"}
-                onClick={() => {
-                  setShowNote((v) => !v);
-                  if (showNote) setNote("");
-                }}
-              >
-                <StickyNote className="size-4" />
-                Nota
-              </Button>
-            </div>
-            {showRepeat && (
-              <Field label="Repetir">
-                <select
-                  className="control"
-                  value={repeat}
-                  onChange={(e) => setRepeat(e.target.value as Repeat)}
-                >
-                  <option value="daily">Diária</option>
-                  <option value="weekly">Semanal</option>
-                  <option value="monthly">Mensal</option>
-                  <option value="yearly">Anual</option>
-                  <option value="installments" disabled={!canInstall}>
+                <SelectTrigger aria-label="Repetir">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Não repetir</SelectItem>
+                  <SelectItem value="daily">Diária</SelectItem>
+                  <SelectItem value="weekly">Semanal</SelectItem>
+                  <SelectItem value="monthly">Mensal</SelectItem>
+                  <SelectItem value="yearly">Anual</SelectItem>
+                  <SelectItem value="installments" disabled={!canInstall}>
                     Parcelado…
-                  </option>
-                </select>
-              </Field>
-            )}
-            {showRepeat && repeat === "installments" && (
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            {repeat === "installments" && (
               <Field label="Número de parcelas">
                 <Input
                   type="number"
@@ -286,23 +298,12 @@ function Transactions() {
                   value={count}
                   onChange={(e) => setCount(e.target.value)}
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Total dividido mensalmente; a última parcela absorve o
-                  arredondamento.
-                </p>
               </Field>
             )}
-            {showNote && (
-              <Field label="Nota">
-                <Input
-                  value={note}
-                  maxLength={500}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </Field>
-            )}
-            <div className="self-end">
-              <Button disabled={create.isPending}>Adicionar transação</Button>
+            <div className="flex items-end sm:pb-2">
+              <Button className="w-full sm:w-auto" disabled={create.isPending}>
+                Adicionar transação
+              </Button>
             </div>
             {create.error && (
               <p className="text-sm text-destructive sm:col-span-full">
@@ -327,7 +328,7 @@ function Transactions() {
             >
               <ChevronLeft />
             </Button>
-            <span className="min-w-40 text-center font-medium">
+            <span className="min-w-0 flex-1 text-center font-medium sm:min-w-40 sm:flex-none">
               {activeMonth ? monthLabel(activeMonth) : "Sem transações"}
             </span>
             <Button
@@ -414,14 +415,16 @@ function Transactions() {
 }
 function Field({
   label,
+  htmlFor,
   children,
 }: {
   label: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>
   );

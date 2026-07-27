@@ -19,6 +19,7 @@ import { Route as AuthedFaturasRouteImport } from './routes/_authed/faturas'
 import { Route as AuthedAccountsRouteImport } from './routes/_authed/accounts'
 import { Route as ApiCronMaterializeRecurrenceRouteImport } from './routes/api/cron.materialize-recurrence'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth.$'
+import { Route as AuthedFaturasAccountIdRouteImport } from './routes/_authed/faturas_.$accountId'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -70,6 +71,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthedFaturasAccountIdRoute = AuthedFaturasAccountIdRouteImport.update({
+  id: '/faturas_/$accountId',
+  path: '/faturas/$accountId',
+  getParentRoute: () => AuthedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/faturas': typeof AuthedFaturasRoute
   '/transactions': typeof AuthedTransactionsRoute
   '/api/transactions': typeof ApiTransactionsRoute
+  '/faturas/$accountId': typeof AuthedFaturasAccountIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/materialize-recurrence': typeof ApiCronMaterializeRecurrenceRoute
 }
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/transactions': typeof AuthedTransactionsRoute
   '/api/transactions': typeof ApiTransactionsRoute
   '/': typeof AuthedIndexRoute
+  '/faturas/$accountId': typeof AuthedFaturasAccountIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/materialize-recurrence': typeof ApiCronMaterializeRecurrenceRoute
 }
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/_authed/transactions': typeof AuthedTransactionsRoute
   '/api/transactions': typeof ApiTransactionsRoute
   '/_authed/': typeof AuthedIndexRoute
+  '/_authed/faturas_/$accountId': typeof AuthedFaturasAccountIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/materialize-recurrence': typeof ApiCronMaterializeRecurrenceRoute
 }
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/faturas'
     | '/transactions'
     | '/api/transactions'
+    | '/faturas/$accountId'
     | '/api/auth/$'
     | '/api/cron/materialize-recurrence'
   fileRoutesByTo: FileRoutesByTo
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/api/transactions'
     | '/'
+    | '/faturas/$accountId'
     | '/api/auth/$'
     | '/api/cron/materialize-recurrence'
   id:
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/_authed/transactions'
     | '/api/transactions'
     | '/_authed/'
+    | '/_authed/faturas_/$accountId'
     | '/api/auth/$'
     | '/api/cron/materialize-recurrence'
   fileRoutesById: FileRoutesById
@@ -224,6 +236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authed/faturas_/$accountId': {
+      id: '/_authed/faturas_/$accountId'
+      path: '/faturas/$accountId'
+      fullPath: '/faturas/$accountId'
+      preLoaderRoute: typeof AuthedFaturasAccountIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
@@ -232,6 +251,7 @@ interface AuthedRouteChildren {
   AuthedFaturasRoute: typeof AuthedFaturasRoute
   AuthedTransactionsRoute: typeof AuthedTransactionsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedFaturasAccountIdRoute: typeof AuthedFaturasAccountIdRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -239,6 +259,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedFaturasRoute: AuthedFaturasRoute,
   AuthedTransactionsRoute: AuthedTransactionsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
+  AuthedFaturasAccountIdRoute: AuthedFaturasAccountIdRoute,
 }
 
 const AuthedRouteWithChildren =

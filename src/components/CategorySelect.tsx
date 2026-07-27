@@ -1,9 +1,12 @@
-import { useState } from "react";
-import { Check, Plus, X } from "lucide-react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-
-const CREATE_CATEGORY_VALUE = "__create_category__";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Check, ChevronDown, LoaderCircle, Plus, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type CategoryOption = {
   id: string;
@@ -23,27 +26,71 @@ export function CategorySelect({
   onChange,
   onCreate,
 }: CategorySelectProps) {
-  const [isCreating, setIsCreating] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
-  const [name, setName] = useState("");
   const [error, setError] = useState("");
+  const [createdCategories, setCreatedCategories] = useState<CategoryOption[]>(
+    []
+  );
+  const rootRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const listboxId = useId();
 
-  const cancel = () => {
-    setIsCreating(false);
-    setName("");
+  const options = useMemo(() => {
+    const byId = new Map(
+      [...createdCategories, ...categories].map((category) => [
+        category.id,
+        category,
+      ])
+    );
+    return [...byId.values()];
+  }, [categories, createdCategories]);
+
+  const normalizedQuery = query.trim();
+  const exactMatch = options.find(
+    (category) =>
+      category.name.localeCompare(normalizedQuery, undefined, {
+        sensitivity: "accent",
+      }) === 0
+  );
+  const filteredCategories = options.filter((category) =>
+    category.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
+  );
+  const selectedCategory = options.find((category) => category.id === value);
+
+  const close = () => {
+    if (isSaving) return;
+    setOpen(false);
+    setQuery("");
+    setError("");
+  };
+
+  const select = (id: string) => {
+    onChange(id);
+    setOpen(false);
+    setQuery("");
     setError("");
   };
 
   const create = async () => {
-    const normalizedName = name.trim();
-    if (!normalizedName || isSaving) return;
+    if (!normalizedQuery || isSaving) return;
+    if (exactMatch) {
+      select(exactMatch.id);
+      return;
+    }
 
     setIsSaving(true);
     setError("");
     try {
-      const id = await onCreate(normalizedName);
-      cancel();
+      const id = await onCreate(normalizedQuery);
+      setCreatedCategories((current) => [
+        ...current.filter((category) => category.id !== id),
+        { id, name: normalizedQuery },
+      ]);
       onChange(id);
+      setOpen(false);
+      setQuery("");
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -55,79 +102,153 @@ export function CategorySelect({
     }
   };
 
+  useEffect(() => {
+    if (open) searchRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) close();
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [open, isSaving]);
+
   return (
-    <div className="space-y-2">
-      <select
-        aria-label="Categoria"
-        className="control"
-        value={isCreating ? CREATE_CATEGORY_VALUE : value}
-        onChange={(event) => {
-          if (event.target.value === CREATE_CATEGORY_VALUE) {
-            setIsCreating(true);
-            setError("");
-            return;
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        className={cn(
+          "control flex items-center justify-between gap-3 text-left",
+          open && "-translate-x-0.5 -translate-y-0.5 shadow-[3px_3px_0_0_var(--foreground)]"
+        )}
+        aria-label={`Categoria: ${selectedCategory?.name ?? "Nenhuma"}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listboxId : undefined}
+        onClick={() => (open ? close() : setOpen(true))}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" && !open) {
+            event.preventDefault();
+            setOpen(true);
           }
-          cancel();
-          onChange(event.target.value);
         }}
       >
-        <option value="">Nenhuma</option>
-        {categories.map((category) => (
-          <option key={category.id} value={category.id}>
-            {category.name}
-          </option>
-        ))}
-        <option value={CREATE_CATEGORY_VALUE}>＋ Criar categoria…</option>
-      </select>
-      {isCreating && (
-        <div className="space-y-2 rounded-md border bg-muted/30 p-2">
-          <div className="flex gap-2">
-            <Input
-              aria-label="Nome da nova categoria"
-              autoFocus
+        <span className={cn("truncate", !selectedCategory && "text-muted-foreground")}>
+          {selectedCategory?.name ?? "Nenhuma"}
+        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")}
+        />
+      </button>
+
+      {open && (
+        <div className="brutal-shadow absolute z-50 mt-1 w-full border-2 sm:min-w-64 border-foreground bg-popover text-popover-foreground">
+          <div className="relative border-b-2 border-foreground">
+            <Search
+              aria-hidden="true"
+              className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              ref={searchRef}
+              aria-label="Buscar ou criar categoria"
+              className="h-11 w-full bg-transparent pl-10 pr-3 text-sm font-medium outline-none placeholder:text-muted-foreground"
               maxLength={100}
-              placeholder="Nome da categoria"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
+              placeholder="Buscar ou criar…"
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setError("");
+              }}
               onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  close();
+                }
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  void create();
+                  if (exactMatch) select(exactMatch.id);
+                  else void create();
                 }
-                if (event.key === "Escape") cancel();
               }}
             />
-            <Button
+          </div>
+
+          <div id={listboxId} role="listbox" aria-label="Categorias" className="max-h-56 overflow-y-auto p-1">
+            {!normalizedQuery && (
+              <CategoryOptionButton
+                selected={!value}
+                label="Nenhuma"
+                onClick={() => select("")}
+              />
+            )}
+            {filteredCategories.map((category) => (
+              <CategoryOptionButton
+                key={category.id}
+                selected={category.id === value}
+                label={category.name}
+                onClick={() => select(category.id)}
+              />
+            ))}
+            {normalizedQuery && filteredCategories.length === 0 && (
+              <p className="px-3 py-2 text-sm text-muted-foreground">
+                Nenhuma categoria encontrada
+              </p>
+            )}
+          </div>
+
+          {normalizedQuery && !exactMatch && (
+            <button
               type="button"
-              size="icon"
-              aria-label="Criar categoria"
-              disabled={!name.trim() || isSaving}
+              className="flex min-h-11 w-full items-center gap-2 border-t-2 border-foreground bg-primary px-3 py-2 text-left text-sm font-bold text-primary-foreground outline-none hover:bg-accent focus-visible:bg-accent disabled:cursor-wait disabled:opacity-60"
+              disabled={isSaving}
               onClick={() => void create()}
             >
               {isSaving ? (
-                <Plus className="size-4 animate-pulse" />
+                <LoaderCircle aria-hidden="true" className="size-4 shrink-0 animate-spin" />
               ) : (
-                <Check className="size-4" />
+                <Plus aria-hidden="true" className="size-4 shrink-0" />
               )}
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              aria-label="Cancelar criação de categoria"
-              disabled={isSaving}
-              onClick={cancel}
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
+              <span className="truncate">
+                {isSaving ? "Criando" : "Criar"} “{normalizedQuery}”
+              </span>
+            </button>
+          )}
+
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="border-t-2 border-foreground bg-background px-3 py-2 text-sm text-destructive">
               {error}
             </p>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+function CategoryOptionButton({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      className="flex min-h-9 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+      onClick={onClick}
+    >
+      <span className="truncate">{label}</span>
+      {selected && <Check aria-hidden="true" className="size-4 shrink-0" />}
+    </button>
   );
 }
