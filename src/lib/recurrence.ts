@@ -61,3 +61,37 @@ export function advance(interval: Interval, dateStr: string): string {
   }
   return fmt(d)
 }
+
+/** Calendar month containing the user's local date, without UTC rollover. */
+export function localMonthKey(now = new Date()): string {
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}`
+}
+
+/** Move a YYYY-MM key by a whole number of calendar months. */
+export function shiftMonth(month: string, delta: number): string {
+  const [year, monthNumber] = month.split('-').map(Number)
+  const date = new Date(Date.UTC(year, monthNumber - 1 + delta, 1))
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}`
+}
+
+/**
+ * Project not-yet-materialized recurrence dates into a month for display.
+ * `nextRun` is always the first pending occurrence, so materialized rows are
+ * never duplicated.
+ */
+export function scheduledDatesInMonth(
+  interval: Interval,
+  nextRun: string,
+  month: string,
+): string[] {
+  if (nextRun.slice(0, 7) > month) return []
+
+  const dates: string[] = []
+  let date = nextRun
+  while (date.slice(0, 7) < month) date = advance(interval, date)
+  while (date.slice(0, 7) === month) {
+    dates.push(date)
+    date = advance(interval, date)
+  }
+  return dates
+}

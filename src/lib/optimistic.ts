@@ -9,6 +9,7 @@ export const financeQueryKeys = {
   categories: ["categories"] as const,
   faturas: ["faturas"] as const,
   installmentPlans: ["installmentPlans"] as const,
+  recurrenceRules: ["recurrenceRules"] as const,
   transactions: ["transactions"] as const,
 };
 

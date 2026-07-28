@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { assertMoney, balanceOf, signedAmount } from './money'
 import { splitInstallments, addMonths } from './installments'
-import { periodKey, advance } from './recurrence'
+import {
+  advance,
+  localMonthKey,
+  periodKey,
+  scheduledDatesInMonth,
+  shiftMonth,
+} from './recurrence'
 
 describe('assertMoney', () => {
   it('accepts non-negative integers', () => {
@@ -81,5 +87,33 @@ describe('advance', () => {
     expect(advance('weekly', '2026-06-22')).toBe('2026-06-29')
     expect(advance('monthly', '2026-06-15')).toBe('2026-07-15')
     expect(advance('yearly', '2026-06-15')).toBe('2027-06-15')
+  })
+})
+
+describe('transaction month navigation', () => {
+  it('can move into an empty next month', () => {
+    expect(shiftMonth('2026-07', 1)).toBe('2026-08')
+    expect(shiftMonth('2026-12', 1)).toBe('2027-01')
+    expect(shiftMonth('2026-01', -1)).toBe('2025-12')
+  })
+
+  it('uses the local calendar month instead of UTC', () => {
+    expect(localMonthKey(new Date(2026, 6, 31, 23, 30))).toBe('2026-07')
+  })
+})
+
+describe('scheduled recurrence projection', () => {
+  it('shows a monthly earning scheduled for next month', () => {
+    expect(scheduledDatesInMonth('monthly', '2026-08-05', '2026-08')).toEqual([
+      '2026-08-05',
+    ])
+  })
+
+  it('projects pending daily occurrences without duplicating prior months', () => {
+    expect(scheduledDatesInMonth('daily', '2026-08-30', '2026-08')).toEqual([
+      '2026-08-30',
+      '2026-08-31',
+    ])
+    expect(scheduledDatesInMonth('daily', '2026-08-30', '2026-07')).toEqual([])
   })
 })

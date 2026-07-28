@@ -7,8 +7,10 @@ import { createCategory, listCategories } from "#/server/categories";
 import {
   createTransaction,
   createTransfer,
+  deleteRecurrenceRule,
   deleteTransaction,
   listInstallmentPlans,
+  listRecurrenceRules,
   listTransactions,
 } from "#/server/transactions";
 import type { CreateTransactionInput, TransferInput } from "#/server/schemas";
@@ -21,6 +23,11 @@ import {
   optimisticTransaction,
   optimisticTransfer,
 } from "#/lib/optimistic";
+import {
+  localMonthKey,
+  scheduledDatesInMonth,
+  shiftMonth,
+} from "#/lib/recurrence";
 import { CategorySelect } from "@/components/CategorySelect";
 import { TransferModal } from "@/components/TransferModal";
 import { Badge } from "@/components/ui/badge";
@@ -85,6 +92,10 @@ function Transactions() {
     queryKey: ["installmentPlans"],
     queryFn: () => listInstallmentPlans(),
   });
+  const { data: recurrenceRules = [] } = useQuery({
+    queryKey: financeQueryKeys.recurrenceRules,
+    queryFn: () => listRecurrenceRules(),
+  });
   const [type, setType] = useState<"earn" | "expend">("expend"),
     [amount, setAmount] = useState(""),
     [date, setDate] = useState(localDateKey),
@@ -102,6 +113,7 @@ function Transactions() {
     Promise.all([
       qc.invalidateQueries({ queryKey: financeQueryKeys.transactions }),
       qc.invalidateQueries({ queryKey: financeQueryKeys.installmentPlans }),
+      qc.invalidateQueries({ queryKey: financeQueryKeys.recurrenceRules }),
     ]);
   const create = useMutation({
     mutationFn: (data: CreateTransactionInput) => createTransaction({ data }),
@@ -173,6 +185,10 @@ function Transactions() {
       qc.setQueryData(financeQueryKeys.transactions, context?.previous),
     onSettled: refresh,
   });
+  const removeRule = useMutation({
+    mutationFn: (id: string) => deleteRecurrenceRule({ data: { id } }),
+    onSettled: refresh,
+  });
   const transfer = useMutation({
     mutationFn: (data: TransferInput) => createTransfer({ data }),
     onMutate: async (data) => {
@@ -192,30 +208,20 @@ function Transactions() {
     onSettled: refresh,
   });
 
-  // Group by month (newest first), always including the current month so it's the default view.
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const months = useMemo(
-    () =>
-      [
-        ...new Set([
-          currentMonth,
-          ...transactions.map((t) => t.date.slice(0, 7)),
-        ]),
-      ]
-        .sort()
-        .reverse(),
-    [transactions, currentMonth]
-  );
-  const [monthIdx, setMonthIdx] = useState(() =>
-    Math.max(0, months.indexOf(currentMonth))
-  );
-  useEffect(() => {
-    if (monthIdx > months.length - 1)
-      setMonthIdx(Math.max(0, months.length - 1));
-  }, [months.length, monthIdx]);
-  const activeMonth = months[monthIdx];
+  // Calendar navigation is independent of existing rows, so empty and future
+  // months remain reachable.
+  const [activeMonth, setActiveMonth] = useState(localMonthKey);
   const monthTx = transactions.filter(
     (t) => t.date.slice(0, 7) === activeMonth
+  );
+  const scheduled = useMemo(
+    () =>
+      recurrenceRules.flatMap((rule) =>
+        scheduledDatesInMonth(rule.interval, rule.nextRun, activeMonth).map(
+          (date) => ({ rule, date }),
+        ),
+      ),
+    [activeMonth, recurrenceRules],
   );
   // installment payment position: x/y where y=plan.count, x=1-based order within the plan.
   const planCount = useMemo(
@@ -403,8 +409,8 @@ function Transactions() {
               type="button"
               variant="ghost"
               size="icon"
-              disabled={monthIdx >= months.length - 1}
-              onClick={() => setMonthIdx((i) => i + 1)}
+              aria-label="Mês anterior"
+              onClick={() => setActiveMonth((month) => shiftMonth(month, -1))}
             >
               <ChevronLeft />
             </Button>
@@ -415,8 +421,8 @@ function Transactions() {
               type="button"
               variant="ghost"
               size="icon"
-              disabled={monthIdx <= 0}
-              onClick={() => setMonthIdx((i) => i - 1)}
+              aria-label="Próximo mês"
+              onClick={() => setActiveMonth((month) => shiftMonth(month, 1))}
             >
               <ChevronRight />
             </Button>
@@ -476,7 +482,43 @@ function Transactions() {
                   </TableCell>
                 </TableRow>
               ))}
-              {monthTx.length === 0 && (
+              {scheduled.map(({ rule, date }) => (
+                <TableRow key={`scheduled-${rule.id}-${date}`}>
+                  <TableCell>{date}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={rule.type === "earn" ? "default" : "secondary"}
+                    >
+                      {rule.type === "earn" ? "receita" : "despesa"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell
+                    className={
+                      rule.type === "earn"
+                        ? "text-emerald-600"
+                        : "text-destructive"
+                    }
+                  >
+                    {rule.type === "earn" ? "+" : "−"}
+                    {money(rule.amount)}
+                  </TableCell>
+                  <TableCell>{rule.note || "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">agendada · recorrente</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={removeRule.isPending}
+                      onClick={() => removeRule.mutate(rule.id)}
+                    >
+                      Excluir
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {monthTx.length === 0 && scheduled.length === 0 && (
                 <TableRow>
                   <TableCell
                     colSpan={6}
