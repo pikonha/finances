@@ -12,7 +12,8 @@ import {
   listInstallmentPlans,
   listTransactions,
 } from "#/server/transactions";
-import { cycleKeyFor } from "#/lib/faturas";
+import { cycleKeyFor, faturaStatus } from "#/lib/faturas";
+import { financeQueryKeys } from "#/lib/optimistic";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,16 +116,54 @@ function FaturaDetail() {
     }
     return indexes;
   }, [transactions]);
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["faturas"] });
+  const setPaidOptimistically = async (cycleKey: string, paid: boolean) => {
+    await queryClient.cancelQueries({ queryKey: financeQueryKeys.faturas });
+    const previous = queryClient.getQueryData<typeof faturas>(
+      financeQueryKeys.faturas,
+    );
+    const currentCycleKey =
+      faturas.find(
+        (fatura) => fatura.accountId === accountId && fatura.isCurrent,
+      )?.cycleKey ?? cycleKey;
+    const today = new Date().toISOString().slice(0, 10);
+    queryClient.setQueryData<typeof faturas>(
+      financeQueryKeys.faturas,
+      (current = []) =>
+        current.map((fatura) =>
+          fatura.accountId === accountId && fatura.cycleKey === cycleKey
+            ? {
+                ...fatura,
+                status: faturaStatus({
+                  cycleKey,
+                  currentCycleKey,
+                  vencimento: fatura.vencimento,
+                  today,
+                  paid,
+                }),
+              }
+            : fatura,
+        ),
+    );
+    return { previous };
+  };
+  const rollbackPaid = (
+    context: { previous: typeof faturas | undefined } | undefined,
+  ) => queryClient.setQueryData(financeQueryKeys.faturas, context?.previous);
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: financeQueryKeys.faturas });
   const markPaid = useMutation({
     mutationFn: (cycleKey: string) =>
       markFaturaPaid({ data: { account_id: accountId, cycle_key: cycleKey } }),
-    onSuccess: refresh,
+    onMutate: (cycleKey) => setPaidOptimistically(cycleKey, true),
+    onError: (_error, _cycleKey, context) => rollbackPaid(context),
+    onSettled: refresh,
   });
   const unmarkPaid = useMutation({
     mutationFn: (cycleKey: string) =>
       unmarkFaturaPaid({ data: { account_id: accountId, cycle_key: cycleKey } }),
-    onSuccess: refresh,
+    onMutate: (cycleKey) => setPaidOptimistically(cycleKey, false),
+    onError: (_error, _cycleKey, context) => rollbackPaid(context),
+    onSettled: refresh,
   });
 
   if (!faturasPending && !cycles.length) {

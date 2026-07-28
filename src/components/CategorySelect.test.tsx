@@ -126,4 +126,62 @@ describe("CategorySelect", () => {
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.queryByLabelText("Buscar ou criar categoria")).toBeNull();
   });
+
+  it("selects options with arrow keys and Space", () => {
+    const onChange = vi.fn();
+    render(
+      <CategorySelect
+        categories={[
+          { id: "groceries-id", name: "Groceries" },
+          { id: "travel-id", name: "Travel" },
+        ]}
+        value=""
+        onChange={onChange}
+        onCreate={vi.fn()}
+      />
+    );
+
+    const trigger = screen.getByRole("button", {
+      name: "Categoria: Nenhuma",
+    });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+
+    const search = screen.getByRole("combobox", {
+      name: "Buscar ou criar categoria",
+    });
+    expect(document.activeElement).toBe(search);
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    fireEvent.keyDown(search, { key: " " });
+
+    expect(onChange).toHaveBeenCalledWith("groceries-id");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("keeps dropdown options out of the form Tab order", () => {
+    render(
+      <>
+        <CategorySelect
+          categories={[{ id: "groceries-id", name: "Groceries" }]}
+          value=""
+          onChange={vi.fn()}
+          onCreate={vi.fn()}
+        />
+        <button type="button">Next field</button>
+      </>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Categoria: Nenhuma" }));
+    const search = screen.getByRole("combobox", {
+      name: "Buscar ou criar categoria",
+    });
+    expect(
+      screen.getAllByRole("option").every((option) => option.tabIndex === -1)
+    ).toBe(true);
+
+    fireEvent.blur(search, {
+      relatedTarget: screen.getByRole("button", { name: "Next field" }),
+    });
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
 });

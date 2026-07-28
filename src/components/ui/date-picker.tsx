@@ -77,11 +77,18 @@ export function DatePicker({
   const [visibleMonth, setVisibleMonth] = useState(() =>
     firstOfMonth(parseDateKey(value)),
   );
+  const [focusedDateKey, setFocusedDateKey] = useState(value);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dayRefs = useRef(new Map<string, HTMLButtonElement>());
   const generatedId = useId();
   const calendarId = `${id}-calendar-${generatedId.replaceAll(":", "")}`;
   const selectedDate = parseDateKey(value);
   const today = localDateKey();
+
+  useEffect(() => {
+    if (open) dayRefs.current.get(focusedDateKey)?.focus();
+  }, [focusedDateKey, open, visibleMonth]);
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +97,11 @@ export function DatePicker({
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     };
 
     document.addEventListener("pointerdown", closeOnOutsidePress);
@@ -104,12 +115,36 @@ export function DatePicker({
   const select = (date: Date) => {
     onChange(localDateKey(date));
     setVisibleMonth(firstOfMonth(date));
+    setFocusedDateKey(localDateKey(date));
     setOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const openCalendar = () => {
+    setVisibleMonth(firstOfMonth(selectedDate));
+    setFocusedDateKey(value);
+    setOpen(true);
+  };
+
+  const moveFocus = (date: Date, days: number) => {
+    const nextDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate() + days,
+    );
+    setFocusedDateKey(localDateKey(nextDate));
+    if (
+      nextDate.getMonth() !== visibleMonth.getMonth() ||
+      nextDate.getFullYear() !== visibleMonth.getFullYear()
+    ) {
+      setVisibleMonth(firstOfMonth(nextDate));
+    }
   };
 
   return (
     <div ref={rootRef} className={cn("relative", className)}>
       <button
+        ref={triggerRef}
         id={id}
         type="button"
         className="control flex items-center justify-between text-left"
@@ -119,8 +154,17 @@ export function DatePicker({
         aria-required={required}
         disabled={disabled}
         onClick={() => {
-          if (!open) setVisibleMonth(firstOfMonth(selectedDate));
-          setOpen((current) => !current);
+          if (open) setOpen(false);
+          else openCalendar();
+        }}
+        onKeyDown={(event) => {
+          if (
+            !open &&
+            (event.key === "ArrowDown" || event.key === "ArrowUp")
+          ) {
+            event.preventDefault();
+            openCalendar();
+          }
         }}
       >
         <span>{valueFormatter.format(selectedDate)}</span>
@@ -177,9 +221,14 @@ export function DatePicker({
                 const inMonth = date.getMonth() === visibleMonth.getMonth();
                 return (
                   <button
+                    ref={(element) => {
+                      if (element) dayRefs.current.set(dateKey, element);
+                      else dayRefs.current.delete(dateKey);
+                    }}
                     key={dateKey}
                     type="button"
                     role="gridcell"
+                    tabIndex={dateKey === focusedDateKey ? 0 : -1}
                     aria-label={accessibleDateFormatter.format(date)}
                     aria-selected={selected}
                     aria-current={dateKey === today ? "date" : undefined}
@@ -194,6 +243,23 @@ export function DatePicker({
                         "after:absolute after:bottom-1 after:size-1 after:bg-destructive",
                     )}
                     onClick={() => select(date)}
+                    onKeyDown={(event) => {
+                      const offsets: Record<string, number> = {
+                        ArrowLeft: -1,
+                        ArrowRight: 1,
+                        ArrowUp: -7,
+                        ArrowDown: 7,
+                      };
+                      const offset = offsets[event.key];
+                      if (offset !== undefined) {
+                        event.preventDefault();
+                        moveFocus(date, offset);
+                      }
+                      if (event.key === " " || event.key === "Enter") {
+                        event.preventDefault();
+                        select(date);
+                      }
+                    }}
                   >
                     {date.getDate()}
                   </button>

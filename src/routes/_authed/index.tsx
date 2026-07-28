@@ -10,8 +10,17 @@ import {
   createTransfer,
   listTransactions,
 } from "#/server/transactions";
-import type { CreateTransactionInput } from "#/server/schemas";
+import type { CreateTransactionInput, TransferInput } from "#/server/schemas";
+import type { Category, Transaction } from "#/db/schema";
 import { balanceOf } from "#/lib/money";
+import {
+  financeQueryKeys,
+  newestTransactions,
+  optimisticCategory,
+  optimisticId,
+  optimisticTransaction,
+  optimisticTransfer,
+} from "#/lib/optimistic";
 import { DashboardCharts } from "@/components/DashboardCharts";
 import { TransactionModal } from "@/components/TransactionModal";
 import { TransferModal } from "@/components/TransferModal";
@@ -54,19 +63,79 @@ function Dashboard() {
   );
   const create = useMutation({
     mutationFn: (data: CreateTransactionInput) => createTransaction({ data }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      void queryClient.invalidateQueries({ queryKey: ["installmentPlans"] });
+    onMutate: async (data) => {
+      await queryClient.cancelQueries({ queryKey: financeQueryKeys.transactions });
+      const previous = queryClient.getQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+      );
+      queryClient.setQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+        (current = []) =>
+          newestTransactions([optimisticTransaction(data), ...current]),
+      );
+      return { previous };
     },
+    onError: (_error, _data, context) =>
+      queryClient.setQueryData(financeQueryKeys.transactions, context?.previous),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: financeQueryKeys.transactions }),
+        queryClient.invalidateQueries({
+          queryKey: financeQueryKeys.installmentPlans,
+        }),
+      ]),
   });
   const createCategoryMutation = useMutation({
     mutationFn: (name: string) => createCategory({ data: { name } }),
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: ["categories"] }),
+    onMutate: async (name) => {
+      await queryClient.cancelQueries({ queryKey: financeQueryKeys.categories });
+      const previous = queryClient.getQueryData<Category[]>(
+        financeQueryKeys.categories,
+      );
+      const temporaryId = optimisticId();
+      queryClient.setQueryData<Category[]>(
+        financeQueryKeys.categories,
+        (current = []) =>
+          [...current, optimisticCategory(name, temporaryId)].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          ),
+      );
+      return { previous, temporaryId };
+    },
+    onSuccess: ({ id }, _name, context) =>
+      queryClient.setQueryData<Category[]>(
+        financeQueryKeys.categories,
+        (current = []) =>
+          current.map((category) =>
+            category.id === context?.temporaryId
+              ? { ...category, id, userId: category.userId }
+              : category,
+          ),
+      ),
+    onError: (_error, _name, context) =>
+      queryClient.setQueryData(financeQueryKeys.categories, context?.previous),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: financeQueryKeys.categories }),
   });
-  const refreshTransactions = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["transactions"] });
-  };
+  const transfer = useMutation({
+    mutationFn: (data: TransferInput) => createTransfer({ data }),
+    onMutate: async (data) => {
+      await queryClient.cancelQueries({ queryKey: financeQueryKeys.transactions });
+      const previous = queryClient.getQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+      );
+      queryClient.setQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+        (current = []) =>
+          newestTransactions([optimisticTransfer(data), ...current]),
+      );
+      return { previous };
+    },
+    onError: (_error, _data, context) =>
+      queryClient.setQueryData(financeQueryKeys.transactions, context?.previous),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: financeQueryKeys.transactions }),
+  });
   const displayMoney = (cents: number) =>
     showValues ? money(cents) : "••••••";
 
@@ -120,8 +189,7 @@ function Dashboard() {
             compact
             accounts={accounts}
             onTransfer={async (data) => {
-              await createTransfer({ data });
-              await refreshTransactions();
+              await transfer.mutateAsync(data);
             }}
           />
         </div>

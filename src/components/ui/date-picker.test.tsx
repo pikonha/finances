@@ -6,8 +6,8 @@ import { DatePicker } from "./date-picker";
 
 afterEach(cleanup);
 
-function Harness() {
-  const [value, setValue] = useState("2026-07-15");
+function Harness({ initialValue = "2026-07-15" }) {
+  const [value, setValue] = useState(initialValue);
   return (
     <div>
       <label htmlFor="test-date">Data</label>
@@ -46,5 +46,54 @@ describe("DatePicker", () => {
 
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "Escolher data" })).toBeNull();
+  });
+
+  it("opens and selects dates using only arrow keys and Space", () => {
+    render(<Harness />);
+    const trigger = screen.getByLabelText("Data");
+    trigger.focus();
+
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+
+    const selectedDay = screen.getByRole("gridcell", {
+      name: /15 de julho de 2026/i,
+    });
+    expect(document.activeElement).toBe(selectedDay);
+
+    fireEvent.keyDown(selectedDay, { key: "ArrowRight" });
+    const nextDay = screen.getByRole("gridcell", {
+      name: /16 de julho de 2026/i,
+    });
+    expect(document.activeElement).toBe(nextDay);
+
+    fireEvent.keyDown(nextDay, { key: "ArrowDown" });
+    const nextWeek = screen.getByRole("gridcell", {
+      name: /23 de julho de 2026/i,
+    });
+    expect(document.activeElement).toBe(nextWeek);
+
+    fireEvent.keyDown(nextWeek, { key: " " });
+    expect(screen.getByText("2026-07-23")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: "Escolher data" })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("moves keyboard focus across month boundaries", () => {
+    render(<Harness initialValue="2026-07-29" />);
+    const trigger = screen.getByLabelText("Data");
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+
+    fireEvent.keyDown(
+      screen.getByRole("gridcell", { name: /29 de julho de 2026/i }),
+      { key: "ArrowDown" },
+    );
+
+    const augustDay = screen.getByRole("gridcell", {
+      name: /^quarta-feira, 5 de agosto de 2026$/i,
+    });
+    expect(document.activeElement).toBe(augustDay);
+    expect(
+      screen.getByRole("heading", { name: "agosto de 2026" }),
+    ).toBeTruthy();
   });
 });
