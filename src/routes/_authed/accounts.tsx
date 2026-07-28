@@ -4,8 +4,14 @@ import { useState } from "react";
 import { createAccount, deleteAccount, listAccounts } from "#/server/accounts";
 import { listFaturas } from "#/server/faturas";
 import { listTransactions } from "#/server/transactions";
+import type { Account, Transaction } from "#/db/schema";
 import { availableLimit } from "#/lib/faturas";
 import { prepaidBalanceOf } from "#/lib/money";
+import {
+  financeQueryKeys,
+  optimisticAccount,
+  optimisticId,
+} from "#/lib/optimistic";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,18 +61,91 @@ function Accounts() {
       dueDay?: number;
       prepaid?: boolean;
     }) => createAccount({ data: d }),
-    onSuccess: () => {
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: financeQueryKeys.accounts });
+      const previous = qc.getQueryData<Account[]>(financeQueryKeys.accounts);
+      const temporaryId = optimisticId();
+      qc.setQueryData<Account[]>(
+        financeQueryKeys.accounts,
+        (current = []) =>
+          [...current, optimisticAccount(input, temporaryId)].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          ),
+      );
+      return { previous, temporaryId };
+    },
+    onSuccess: ({ id }, _input, context) => {
+      qc.setQueryData<Account[]>(
+        financeQueryKeys.accounts,
+        (current = []) =>
+          current.map((account) =>
+            account.id === context?.temporaryId ? { ...account, id } : account,
+          ),
+      );
       setName("");
       setLimit("");
       setClosingDay("");
       setDueDay("");
       setPrepaid(false);
-      qc.invalidateQueries({ queryKey: ["accounts"] });
     },
+    onError: (_error, _input, context) =>
+      qc.setQueryData(financeQueryKeys.accounts, context?.previous),
+    onSettled: () =>
+      qc.invalidateQueries({ queryKey: financeQueryKeys.accounts }),
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteAccount({ data: { id } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+    onMutate: async (id) => {
+      await Promise.all([
+        qc.cancelQueries({ queryKey: financeQueryKeys.accounts }),
+        qc.cancelQueries({ queryKey: financeQueryKeys.transactions }),
+        qc.cancelQueries({ queryKey: financeQueryKeys.faturas }),
+      ]);
+      const previousAccounts = qc.getQueryData<Account[]>(
+        financeQueryKeys.accounts,
+      );
+      const previousTransactions = qc.getQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+      );
+      const previousFaturas = qc.getQueryData<typeof faturas>(
+        financeQueryKeys.faturas,
+      );
+      qc.setQueryData<Account[]>(financeQueryKeys.accounts, (current = []) =>
+        current.filter((account) => account.id !== id),
+      );
+      qc.setQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+        (current = []) =>
+          current.map((transaction) => ({
+            ...transaction,
+            accountId:
+              transaction.accountId === id ? null : transaction.accountId,
+            counterAccountId:
+              transaction.counterAccountId === id
+                ? null
+                : transaction.counterAccountId,
+          })),
+      );
+      qc.setQueryData<typeof faturas>(
+        financeQueryKeys.faturas,
+        (current = []) => current.filter((fatura) => fatura.accountId !== id),
+      );
+      return { previousAccounts, previousTransactions, previousFaturas };
+    },
+    onError: (_error, _id, context) => {
+      qc.setQueryData(financeQueryKeys.accounts, context?.previousAccounts);
+      qc.setQueryData(
+        financeQueryKeys.transactions,
+        context?.previousTransactions,
+      );
+      qc.setQueryData(financeQueryKeys.faturas, context?.previousFaturas);
+    },
+    onSettled: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: financeQueryKeys.accounts }),
+        qc.invalidateQueries({ queryKey: financeQueryKeys.transactions }),
+        qc.invalidateQueries({ queryKey: financeQueryKeys.faturas }),
+      ]),
   });
   return (
     <main className="page-wrap rise-in py-6 sm:py-10">

@@ -11,7 +11,16 @@ import {
   listInstallmentPlans,
   listTransactions,
 } from "#/server/transactions";
-import type { CreateTransactionInput } from "#/server/schemas";
+import type { CreateTransactionInput, TransferInput } from "#/server/schemas";
+import type { Category, Transaction } from "#/db/schema";
+import {
+  financeQueryKeys,
+  newestTransactions,
+  optimisticCategory,
+  optimisticId,
+  optimisticTransaction,
+  optimisticTransfer,
+} from "#/lib/optimistic";
 import { CategorySelect } from "@/components/CategorySelect";
 import { TransferModal } from "@/components/TransferModal";
 import { Badge } from "@/components/ui/badge";
@@ -89,26 +98,98 @@ function Transactions() {
   useEffect(() => {
     if (repeat === "installments" && !canInstall) setRepeat("monthly");
   }, [repeat, canInstall]);
-  const refresh = () => {
-    qc.invalidateQueries({ queryKey: ["transactions"] });
-    qc.invalidateQueries({ queryKey: ["installmentPlans"] });
-  };
+  const refresh = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: financeQueryKeys.transactions }),
+      qc.invalidateQueries({ queryKey: financeQueryKeys.installmentPlans }),
+    ]);
   const create = useMutation({
     mutationFn: (data: CreateTransactionInput) => createTransaction({ data }),
+    onMutate: async (data) => {
+      await qc.cancelQueries({ queryKey: financeQueryKeys.transactions });
+      const previous = qc.getQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+      );
+      qc.setQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+        (current = []) =>
+          newestTransactions([optimisticTransaction(data), ...current]),
+      );
+      return { previous };
+    },
+    onError: (_error, _data, context) =>
+      qc.setQueryData(financeQueryKeys.transactions, context?.previous),
     onSuccess: () => {
-      refresh();
       setAmount("");
       setNote("");
       setRepeat("none");
     },
+    onSettled: refresh,
   });
   const createCategoryMutation = useMutation({
     mutationFn: (name: string) => createCategory({ data: { name } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["categories"] }),
+    onMutate: async (name) => {
+      await qc.cancelQueries({ queryKey: financeQueryKeys.categories });
+      const previous = qc.getQueryData<Category[]>(financeQueryKeys.categories);
+      const temporaryId = optimisticId();
+      qc.setQueryData<Category[]>(
+        financeQueryKeys.categories,
+        (current = []) =>
+          [...current, optimisticCategory(name, temporaryId)].sort((a, b) =>
+            a.name.localeCompare(b.name),
+          ),
+      );
+      return { previous, temporaryId };
+    },
+    onSuccess: ({ id }, _name, context) =>
+      qc.setQueryData<Category[]>(
+        financeQueryKeys.categories,
+        (current = []) =>
+          current.map((category) =>
+            category.id === context?.temporaryId
+              ? { ...category, id }
+              : category,
+          ),
+      ),
+    onError: (_error, _name, context) =>
+      qc.setQueryData(financeQueryKeys.categories, context?.previous),
+    onSettled: () =>
+      qc.invalidateQueries({ queryKey: financeQueryKeys.categories }),
   });
   const removeTx = useMutation({
     mutationFn: (id: string) => deleteTransaction({ data: { id } }),
-    onSuccess: refresh,
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: financeQueryKeys.transactions });
+      const previous = qc.getQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+      );
+      qc.setQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+        (current = []) => current.filter((transaction) => transaction.id !== id),
+      );
+      return { previous };
+    },
+    onError: (_error, _id, context) =>
+      qc.setQueryData(financeQueryKeys.transactions, context?.previous),
+    onSettled: refresh,
+  });
+  const transfer = useMutation({
+    mutationFn: (data: TransferInput) => createTransfer({ data }),
+    onMutate: async (data) => {
+      await qc.cancelQueries({ queryKey: financeQueryKeys.transactions });
+      const previous = qc.getQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+      );
+      qc.setQueryData<Transaction[]>(
+        financeQueryKeys.transactions,
+        (current = []) =>
+          newestTransactions([optimisticTransfer(data), ...current]),
+      );
+      return { previous };
+    },
+    onError: (_error, _data, context) =>
+      qc.setQueryData(financeQueryKeys.transactions, context?.previous),
+    onSettled: refresh,
   });
 
   // Group by month (newest first), always including the current month so it's the default view.
@@ -166,8 +247,7 @@ function Transactions() {
         <TransferModal
           accounts={accounts}
           onTransfer={async (data) => {
-            await createTransfer({ data });
-            refresh();
+            await transfer.mutateAsync(data);
           }}
         />
       </div>

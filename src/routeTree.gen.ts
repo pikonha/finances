@@ -14,9 +14,12 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as ApiTransactionsRouteImport } from './routes/api/transactions'
+import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as AuthedTransactionsRouteImport } from './routes/_authed/transactions'
 import { Route as AuthedFaturasRouteImport } from './routes/_authed/faturas'
 import { Route as AuthedAccountsRouteImport } from './routes/_authed/accounts'
+import { Route as DotwellKnownOauthProtectedResourceRouteImport } from './routes/[.]well-known.oauth-protected-resource'
+import { Route as DotwellKnownOauthAuthorizationServerRouteImport } from './routes/[.]well-known.oauth-authorization-server'
 import { Route as ApiCronMaterializeRecurrenceRouteImport } from './routes/api/cron.materialize-recurrence'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth.$'
 import { Route as AuthedFaturasAccountIdRouteImport } from './routes/_authed/faturas_.$accountId'
@@ -45,6 +48,11 @@ const ApiTransactionsRoute = ApiTransactionsRouteImport.update({
   path: '/api/transactions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthedTransactionsRoute = AuthedTransactionsRouteImport.update({
   id: '/transactions',
   path: '/transactions',
@@ -60,6 +68,18 @@ const AuthedAccountsRoute = AuthedAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AuthedRoute,
 } as any)
+const DotwellKnownOauthProtectedResourceRoute =
+  DotwellKnownOauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DotwellKnownOauthAuthorizationServerRoute =
+  DotwellKnownOauthAuthorizationServerRouteImport.update({
+    id: '/.well-known/oauth-authorization-server',
+    path: '/.well-known/oauth-authorization-server',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiCronMaterializeRecurrenceRoute =
   ApiCronMaterializeRecurrenceRouteImport.update({
     id: '/api/cron/materialize-recurrence',
@@ -81,9 +101,12 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthedIndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/accounts': typeof AuthedAccountsRoute
   '/faturas': typeof AuthedFaturasRoute
   '/transactions': typeof AuthedTransactionsRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/api/transactions': typeof ApiTransactionsRoute
   '/faturas/$accountId': typeof AuthedFaturasAccountIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -92,9 +115,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/accounts': typeof AuthedAccountsRoute
   '/faturas': typeof AuthedFaturasRoute
   '/transactions': typeof AuthedTransactionsRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/api/transactions': typeof ApiTransactionsRoute
   '/': typeof AuthedIndexRoute
   '/faturas/$accountId': typeof AuthedFaturasAccountIdRoute
@@ -106,9 +132,12 @@ export interface FileRoutesById {
   '/_authed': typeof AuthedRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/.well-known/oauth-authorization-server': typeof DotwellKnownOauthAuthorizationServerRoute
+  '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/_authed/accounts': typeof AuthedAccountsRoute
   '/_authed/faturas': typeof AuthedFaturasRoute
   '/_authed/transactions': typeof AuthedTransactionsRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/api/transactions': typeof ApiTransactionsRoute
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/faturas_/$accountId': typeof AuthedFaturasAccountIdRoute
@@ -121,9 +150,12 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/accounts'
     | '/faturas'
     | '/transactions'
+    | '/api/mcp'
     | '/api/transactions'
     | '/faturas/$accountId'
     | '/api/auth/$'
@@ -132,9 +164,12 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/signup'
+    | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/accounts'
     | '/faturas'
     | '/transactions'
+    | '/api/mcp'
     | '/api/transactions'
     | '/'
     | '/faturas/$accountId'
@@ -145,9 +180,12 @@ export interface FileRouteTypes {
     | '/_authed'
     | '/login'
     | '/signup'
+    | '/.well-known/oauth-authorization-server'
+    | '/.well-known/oauth-protected-resource'
     | '/_authed/accounts'
     | '/_authed/faturas'
     | '/_authed/transactions'
+    | '/api/mcp'
     | '/api/transactions'
     | '/_authed/'
     | '/_authed/faturas_/$accountId'
@@ -159,6 +197,9 @@ export interface RootRouteChildren {
   AuthedRoute: typeof AuthedRouteWithChildren
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  DotwellKnownOauthAuthorizationServerRoute: typeof DotwellKnownOauthAuthorizationServerRoute
+  DotwellKnownOauthProtectedResourceRoute: typeof DotwellKnownOauthProtectedResourceRoute
+  ApiMcpRoute: typeof ApiMcpRoute
   ApiTransactionsRoute: typeof ApiTransactionsRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiCronMaterializeRecurrenceRoute: typeof ApiCronMaterializeRecurrenceRoute
@@ -201,6 +242,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTransactionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authed/transactions': {
       id: '/_authed/transactions'
       path: '/transactions'
@@ -221,6 +269,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/accounts'
       preLoaderRoute: typeof AuthedAccountsRouteImport
       parentRoute: typeof AuthedRoute
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof DotwellKnownOauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-authorization-server': {
+      id: '/.well-known/oauth-authorization-server'
+      path: '/.well-known/oauth-authorization-server'
+      fullPath: '/.well-known/oauth-authorization-server'
+      preLoaderRoute: typeof DotwellKnownOauthAuthorizationServerRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/cron/materialize-recurrence': {
       id: '/api/cron/materialize-recurrence'
@@ -269,6 +331,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuthedRoute: AuthedRouteWithChildren,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  DotwellKnownOauthAuthorizationServerRoute:
+    DotwellKnownOauthAuthorizationServerRoute,
+  DotwellKnownOauthProtectedResourceRoute:
+    DotwellKnownOauthProtectedResourceRoute,
+  ApiMcpRoute: ApiMcpRoute,
   ApiTransactionsRoute: ApiTransactionsRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiCronMaterializeRecurrenceRoute: ApiCronMaterializeRecurrenceRoute,

@@ -28,6 +28,7 @@ export function CategorySelect({
 }: CategorySelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [createdCategories, setCreatedCategories] = useState<CategoryOption[]>(
@@ -57,12 +58,28 @@ export function CategorySelect({
   const filteredCategories = options.filter((category) =>
     category.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())
   );
+  const selectableOptions = [
+    ...(!normalizedQuery ? [{ id: "", name: "Nenhuma" }] : []),
+    ...filteredCategories,
+  ];
   const selectedCategory = options.find((category) => category.id === value);
+  const activeOption = selectableOptions[activeIndex];
+  const optionId = (id: string) =>
+    `${listboxId}-option-${id || "none"}`;
+
+  const openDropdown = () => {
+    const selectedIndex = selectableOptions.findIndex(
+      (option) => option.id === value
+    );
+    setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    setOpen(true);
+  };
 
   const close = () => {
     if (isSaving) return;
     setOpen(false);
     setQuery("");
+    setActiveIndex(0);
     setError("");
   };
 
@@ -70,6 +87,7 @@ export function CategorySelect({
     onChange(id);
     setOpen(false);
     setQuery("");
+    setActiveIndex(0);
     setError("");
   };
 
@@ -118,7 +136,18 @@ export function CategorySelect({
   }, [open, isSaving]);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div
+      ref={rootRef}
+      className="relative"
+      onBlur={(event) => {
+        if (
+          open &&
+          !event.currentTarget.contains(event.relatedTarget as Node | null)
+        ) {
+          close();
+        }
+      }}
+    >
       <button
         type="button"
         className={cn(
@@ -129,11 +158,14 @@ export function CategorySelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
-        onClick={() => (open ? close() : setOpen(true))}
+        onClick={() => (open ? close() : openDropdown())}
         onKeyDown={(event) => {
-          if (event.key === "ArrowDown" && !open) {
+          if (
+            !open &&
+            (event.key === "ArrowDown" || event.key === "ArrowUp")
+          ) {
             event.preventDefault();
-            setOpen(true);
+            openDropdown();
           }
         }}
       >
@@ -156,12 +188,20 @@ export function CategorySelect({
             <input
               ref={searchRef}
               aria-label="Buscar ou criar categoria"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls={listboxId}
+              aria-expanded={open}
+              aria-activedescendant={
+                activeOption ? optionId(activeOption.id) : undefined
+              }
               className="h-11 w-full bg-transparent pl-10 pr-3 text-sm font-medium outline-none placeholder:text-muted-foreground"
               maxLength={100}
               placeholder="Buscar ou criar…"
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
+                setActiveIndex(0);
                 setError("");
               }}
               onKeyDown={(event) => {
@@ -169,9 +209,28 @@ export function CategorySelect({
                   event.preventDefault();
                   close();
                 }
+                if (event.key === "ArrowDown" && selectableOptions.length) {
+                  event.preventDefault();
+                  setActiveIndex((current) =>
+                    Math.min(current + 1, selectableOptions.length - 1)
+                  );
+                }
+                if (event.key === "ArrowUp" && selectableOptions.length) {
+                  event.preventDefault();
+                  setActiveIndex((current) => Math.max(current - 1, 0));
+                }
+                if (
+                  event.key === " " &&
+                  activeOption &&
+                  !normalizedQuery
+                ) {
+                  event.preventDefault();
+                  select(activeOption.id);
+                }
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  if (exactMatch) select(exactMatch.id);
+                  if (activeOption) select(activeOption.id);
+                  else if (exactMatch) select(exactMatch.id);
                   else void create();
                 }
               }}
@@ -181,6 +240,8 @@ export function CategorySelect({
           <div id={listboxId} role="listbox" aria-label="Categorias" className="max-h-56 overflow-y-auto p-1">
             {!normalizedQuery && (
               <CategoryOptionButton
+                id={optionId("")}
+                active={activeOption?.id === ""}
                 selected={!value}
                 label="Nenhuma"
                 onClick={() => select("")}
@@ -189,6 +250,8 @@ export function CategorySelect({
             {filteredCategories.map((category) => (
               <CategoryOptionButton
                 key={category.id}
+                id={optionId(category.id)}
+                active={activeOption?.id === category.id}
                 selected={category.id === value}
                 label={category.name}
                 onClick={() => select(category.id)}
@@ -206,6 +269,7 @@ export function CategorySelect({
               type="button"
               className="flex min-h-11 w-full items-center gap-2 border-t-2 border-foreground bg-primary px-3 py-2 text-left text-sm font-bold text-primary-foreground outline-none hover:bg-accent focus-visible:bg-accent disabled:cursor-wait disabled:opacity-60"
               disabled={isSaving}
+              tabIndex={-1}
               onClick={() => void create()}
             >
               {isSaving ? (
@@ -231,10 +295,14 @@ export function CategorySelect({
 }
 
 function CategoryOptionButton({
+  id,
+  active,
   label,
   selected,
   onClick,
 }: {
+  id: string;
+  active: boolean;
   label: string;
   selected: boolean;
   onClick: () => void;
@@ -242,9 +310,14 @@ function CategoryOptionButton({
   return (
     <button
       type="button"
+      id={id}
       role="option"
       aria-selected={selected}
-      className="flex min-h-9 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+      tabIndex={-1}
+      className={cn(
+        "flex min-h-9 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm font-medium outline-none hover:bg-accent hover:text-accent-foreground",
+        active && "bg-accent text-accent-foreground"
+      )}
       onClick={onClick}
     >
       <span className="truncate">{label}</span>

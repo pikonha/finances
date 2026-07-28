@@ -2,7 +2,7 @@ services:
   app:
     image: node:22-alpine
     working_dir: /app
-    command: sh -c "corepack enable && pnpm install --dangerously-allow-all-builds && pnpm dev --host"
+    command: sh -c "corepack enable && pnpm install --dangerously-allow-all-builds && pnpm db:migrate && pnpm db:seed && pnpm dev --host"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/finances
       BETTER_AUTH_SECRET: dev-secret-dev-secret-dev-secret-123

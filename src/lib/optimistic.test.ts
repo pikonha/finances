@@ -1,0 +1,81 @@
+import { describe, expect, it } from "vitest";
+import {
+  newestTransactions,
+  optimisticAccount,
+  optimisticCategory,
+  optimisticTransaction,
+  optimisticTransfer,
+} from "./optimistic";
+
+describe("optimistic finance rows", () => {
+  it("builds a transaction in the server row shape", () => {
+    const row = optimisticTransaction(
+      {
+        type: "expend",
+        amount: 1234,
+        date: "2026-07-27",
+        account_id: "account",
+        category_id: "category",
+        note: "Lunch",
+      },
+      "temporary",
+    );
+
+    expect(row).toMatchObject({
+      id: "temporary",
+      type: "expend",
+      amount: 1234,
+      accountId: "account",
+      categoryId: "category",
+      note: "Lunch",
+    });
+  });
+
+  it("builds a transfer with both accounts", () => {
+    const row = optimisticTransfer(
+      {
+        amount: 500,
+        date: "2026-07-27",
+        account_id: "from",
+        counter_account_id: "to",
+      },
+      "temporary",
+    );
+
+    expect(row).toMatchObject({
+      type: "transfer",
+      accountId: "from",
+      counterAccountId: "to",
+    });
+  });
+
+  it("normalizes account and category rows", () => {
+    expect(
+      optimisticAccount(
+        { name: "Card", kind: "credit_card", prepaid: true, limit: 1000 },
+        "account",
+      ),
+    ).toMatchObject({ id: "account", prepaid: true, limit: null });
+    expect(optimisticCategory("Food", "category")).toEqual({
+      id: "category",
+      userId: "optimistic",
+      name: "Food",
+    });
+  });
+
+  it("keeps newest transactions first", () => {
+    const old = optimisticTransaction(
+      { type: "earn", amount: 1, date: "2026-06-01" },
+      "old",
+    );
+    const recent = optimisticTransaction(
+      { type: "earn", amount: 1, date: "2026-07-01" },
+      "recent",
+    );
+
+    expect(newestTransactions([old, recent]).map((row) => row.id)).toEqual([
+      "recent",
+      "old",
+    ]);
+  });
+});
