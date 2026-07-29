@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { Minus, Plus } from "lucide-react";
-import type { CreateTransactionInput } from "#/server/schemas";
+import type {
+  CreateTransactionInput,
+  UpdateTransactionInput,
+} from "#/server/schemas";
 import { CategorySelect } from "./CategorySelect";
 import { MoneyInput } from "./MoneyInput";
 import { Button } from "./ui/button";
@@ -32,15 +35,27 @@ type RepeatInterval =
   | "monthly"
   | "yearly"
   | "installments";
-type CategoryOption = { id: string; name: string };
+type CategoryOption = { id: string; name: string; color: string };
 type AccountOption = { id: string; name: string; kind: string };
+type EditableTransaction = {
+  id: string;
+  type: "earn" | "expend";
+  amount: number;
+  date: string;
+  tags: { id: string }[];
+  accountId: string | null;
+  note: string | null;
+};
 
 type TransactionModalProps = {
   type: "earn" | "expend";
   accounts: AccountOption[];
   categories: CategoryOption[];
-  onCreate: (data: CreateTransactionInput) => Promise<unknown>;
-  onCreateCategory: (name: string) => Promise<string>;
+  trigger?: React.ReactNode;
+  initialTransaction?: EditableTransaction;
+  onCreate?: (data: CreateTransactionInput) => Promise<unknown>;
+  onUpdate?: (data: UpdateTransactionInput) => Promise<unknown>;
+  onCreateCategory: (name: string, color: string) => Promise<string>;
 };
 
 const today = () => localDateKey();
@@ -49,13 +64,19 @@ export function TransactionModal({
   type,
   accounts,
   categories,
+  trigger,
+  initialTransaction,
   onCreate,
+  onUpdate,
   onCreateCategory,
 }: TransactionModalProps) {
   const [open, setOpen] = useState(false);
+  const [transactionType, setTransactionType] = useState<"earn" | "expend">(
+    initialTransaction?.type ?? type
+  );
   const [amount, setAmount] = useState<number | null>(null);
   const [date, setDate] = useState(today);
-  const [categoryId, setCategoryId] = useState("");
+  const [tagIds, setTagIds] = useState<string[]>([]);
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
   const [repeat, setRepeat] = useState<RepeatInterval>("none");
@@ -63,23 +84,29 @@ export function TransactionModal({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const isEditing = Boolean(initialTransaction);
   const selectedAccount = accounts.find((account) => account.id === accountId);
   const canInstall =
-    type === "expend" && selectedAccount?.kind === "credit_card";
+    transactionType === "expend" && selectedAccount?.kind === "credit_card";
   useEffect(() => {
     if (repeat === "installments" && !canInstall) setRepeat("monthly");
   }, [canInstall, repeat]);
 
-  const reset = () => {
-    setAmount(null);
-    setDate(today());
-    setCategoryId("");
-    setAccountId("");
-    setNote("");
+  const reset = (source = initialTransaction) => {
+    setTransactionType(source?.type ?? type);
+    setAmount(source?.amount ?? null);
+    setDate(source?.date ?? today());
+    setTagIds(source?.tags.map((tag) => tag.id) ?? []);
+    setAccountId(source?.accountId ?? "");
+    setNote(source?.note ?? "");
     setRepeat("none");
     setCount("2");
     setError("");
   };
+
+  useEffect(() => {
+    if (open) reset();
+  }, [initialTransaction, open]);
 
   const changeOpen = (nextOpen: boolean) => {
     if (isSaving) return;
@@ -90,30 +117,39 @@ export function TransactionModal({
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
-        <Button
-          type="button"
-          size="icon"
-          className="rounded-full"
-          variant={type === "earn" ? "default" : "destructive"}
-          aria-label={
-            type === "earn" ? "Adicionar receita" : "Adicionar despesa"
-          }
-        >
-          {type === "earn" ? (
-            <Plus className="size-5" />
-          ) : (
-            <Minus className="size-5" />
-          )}
-        </Button>
+        {trigger ?? (
+          <Button
+            type="button"
+            size="icon"
+            className="rounded-full"
+            variant={type === "earn" ? "default" : "destructive"}
+            aria-label={
+              type === "earn" ? "Adicionar receita" : "Adicionar despesa"
+            }
+          >
+            {type === "earn" ? (
+              <Plus className="size-5" />
+            ) : (
+              <Minus className="size-5" />
+            )}
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {type === "earn" ? "Adicionar receita" : "Adicionar despesa"}
+            {isEditing
+              ? "Editar transação"
+              : type === "earn"
+                ? "Adicionar receita"
+                : "Adicionar despesa"}
           </DialogTitle>
           <DialogDescription>
-            Registre {type === "earn" ? "dinheiro recebido" : "dinheiro gasto"}{" "}
-            no seu painel.
+            {isEditing
+              ? "Atualize os dados desta transação."
+              : `Registre ${
+                  type === "earn" ? "dinheiro recebido" : "dinheiro gasto"
+                } no seu painel.`}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -125,22 +161,36 @@ export function TransactionModal({
             setIsSaving(true);
             setError("");
             try {
-              await onCreate({
-                type,
-                amount,
-                date,
-                category_id: categoryId || undefined,
-                account_id: accountId || undefined,
-                note: note || undefined,
-                recurrence:
-                  repeat !== "none" && repeat !== "installments"
-                    ? { interval: repeat }
-                    : undefined,
-                installments:
-                  repeat === "installments"
-                    ? { count: Number(count) }
-                    : undefined,
-              });
+              if (isEditing && initialTransaction) {
+                if (!onUpdate) throw new Error("Edição indisponível");
+                await onUpdate({
+                  id: initialTransaction.id,
+                  type: transactionType,
+                  amount,
+                  date,
+                  tag_ids: tagIds.length ? tagIds : undefined,
+                  account_id: accountId || undefined,
+                  note: note || undefined,
+                });
+              } else {
+                if (!onCreate) throw new Error("Criação indisponível");
+                await onCreate({
+                  type,
+                  amount,
+                  date,
+                  tag_ids: tagIds.length ? tagIds : undefined,
+                  account_id: accountId || undefined,
+                  note: note || undefined,
+                  recurrence:
+                    repeat !== "none" && repeat !== "installments"
+                      ? { interval: repeat }
+                      : undefined,
+                  installments:
+                    repeat === "installments"
+                      ? { count: Number(count) }
+                      : undefined,
+                });
+              }
               setOpen(false);
               reset();
             } catch (cause) {
@@ -163,6 +213,24 @@ export function TransactionModal({
                 onChange={(event) => setNote(event.target.value)}
               />
             </Field>
+            {isEditing && (
+              <Field label="Tipo" htmlFor="transaction-type">
+                <Select
+                  value={transactionType}
+                  onValueChange={(value) =>
+                    setTransactionType(value as typeof transactionType)
+                  }
+                >
+                  <SelectTrigger id="transaction-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="expend">Despesa</SelectItem>
+                    <SelectItem value="earn">Receita</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
             <Field label="Valor (R$)" htmlFor="transaction-amount">
               <MoneyInput
                 id="transaction-amount"
@@ -204,39 +272,39 @@ export function TransactionModal({
               </Select>
             </Field>
             <div className="space-y-2">
-              <Label>Categoria</Label>
+              <Label>Etiquetas</Label>
               <CategorySelect
                 categories={categories}
-                value={categoryId}
-                onChange={setCategoryId}
+                value={tagIds}
+                onChange={setTagIds}
                 onCreate={onCreateCategory}
               />
             </div>
+            {!isEditing && (
+              <Field label="Repetir" htmlFor="transaction-repeat">
+                <Select
+                  value={repeat}
+                  onValueChange={(value) => setRepeat(value as RepeatInterval)}
+                >
+                  <SelectTrigger id="transaction-repeat">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Não repetir</SelectItem>
+                    <SelectItem value="daily">Diária</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                    <SelectItem value="installments" disabled={!canInstall}>
+                      Parcelado…
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Repetir" htmlFor="transaction-repeat">
-              <Select
-                value={repeat}
-                onValueChange={(value) =>
-                  setRepeat(value as RepeatInterval)
-                }
-              >
-                <SelectTrigger id="transaction-repeat">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Não repetir</SelectItem>
-                  <SelectItem value="daily">Diária</SelectItem>
-                  <SelectItem value="weekly">Semanal</SelectItem>
-                  <SelectItem value="monthly">Mensal</SelectItem>
-                  <SelectItem value="yearly">Anual</SelectItem>
-                  <SelectItem value="installments" disabled={!canInstall}>
-                    Parcelado…
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            {repeat === "installments" && (
+          {!isEditing && repeat === "installments" && (
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label="Número de parcelas"
                 htmlFor="transaction-installments"
@@ -251,8 +319,8 @@ export function TransactionModal({
                   required
                 />
               </Field>
-            )}
-          </div>
+            </div>
+          )}
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -265,7 +333,13 @@ export function TransactionModal({
               </Button>
             </DialogClose>
             <Button disabled={isSaving}>
-              {isSaving ? "Adicionando…" : "Adicionar transação"}
+              {isSaving
+                ? isEditing
+                  ? "Salvando…"
+                  : "Adicionando…"
+                : isEditing
+                  ? "Salvar transação"
+                  : "Adicionar transação"}
             </Button>
           </div>
         </form>

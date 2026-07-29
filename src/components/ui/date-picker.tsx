@@ -9,6 +9,7 @@ type DatePickerProps = {
   required?: boolean;
   disabled?: boolean;
   className?: string;
+  calendarPlacement?: "bottom" | "top";
 };
 
 const monthFormatter = new Intl.DateTimeFormat("pt-BR", {
@@ -72,6 +73,7 @@ export function DatePicker({
   required,
   disabled,
   className,
+  calendarPlacement = "bottom",
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() =>
@@ -177,7 +179,10 @@ export function DatePicker({
           role="dialog"
           aria-modal="false"
           aria-label="Escolher data"
-          className="brutal-shadow absolute right-0 z-[70] mt-2 w-[min(20rem,calc(100vw-3rem))] border-2 border-foreground bg-popover p-3 text-popover-foreground"
+          className={cn(
+            "brutal-shadow absolute right-0 z-[70] w-[min(20rem,calc(100vw-3rem))] border-2 border-foreground bg-popover p-3 text-popover-foreground",
+            calendarPlacement === "top" ? "bottom-full mb-2" : "top-full mt-2",
+          )}
         >
           <div className="mb-3 flex items-center justify-between gap-2">
             <button

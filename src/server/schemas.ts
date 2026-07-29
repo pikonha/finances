@@ -1,14 +1,24 @@
 import { z } from 'zod'
+import { DEFAULT_TAG_COLOR } from '#/lib/tag-colors'
+import { DEFAULT_TRANSFER_NOTE } from '#/lib/transaction-labels'
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD')
 const cents = z.number().int('amount must be integer cents')
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'color must be #RRGGBB').transform((color) => color.toLowerCase())
 
 export const transactionInput = z.object({
   type: z.enum(['earn', 'expend']), amount: cents.positive(), date: isoDate,
-  category_id: z.string().uuid().optional(), account_id: z.string().uuid().optional(),
+  tag_ids: z.array(z.string().uuid()).max(20).optional(),
+  category_id: z.string().uuid().optional(),
+  account_id: z.string().uuid().optional(),
   note: z.string().max(500).optional(),
 })
 export type TransactionInput = z.infer<typeof transactionInput>
+
+export const updateTransactionInput = transactionInput.extend({
+  id: z.string().uuid(),
+})
+export type UpdateTransactionInput = z.infer<typeof updateTransactionInput>
 
 export const createTransactionInput = transactionInput.extend({
   installments: z.object({ count: z.number().int().min(2).max(360) }).optional(),
@@ -21,7 +31,7 @@ export type CreateTransactionInput = z.infer<typeof createTransactionInput>
 export const transferInput = z.object({
   amount: cents.positive(), date: isoDate,
   account_id: z.string().uuid(), counter_account_id: z.string().uuid(),
-  note: z.string().max(500).optional(),
+  note: z.string().max(500).optional().default(DEFAULT_TRANSFER_NOTE),
 }).refine((data) => data.account_id !== data.counter_account_id, {
   message: 'Cannot transfer to the same account',
 })
@@ -29,7 +39,10 @@ export type TransferInput = z.infer<typeof transferInput>
 
 export const faturaPaymentInput = z.object({ account_id: z.string().uuid(), cycle_key: isoDate, paid_at: isoDate.optional() })
 
-export const categoryInput = z.object({ name: z.string().trim().min(1).max(100) })
+export const categoryInput = z.object({
+  name: z.string().trim().min(1).max(100),
+  color: hexColor.default(DEFAULT_TAG_COLOR),
+})
 export const accountInput = z.object({
   name: z.string().trim().min(1).max(100),
   kind: z.enum(['credit_card', 'bank_account']), limit: cents.nonnegative().optional(),
@@ -39,3 +52,13 @@ export const accountInput = z.object({
 }).refine((data) => data.kind !== 'credit_card' || data.prepaid || (data.closingDay !== undefined && data.dueDay !== undefined), {
   message: 'closingDay and dueDay are required for limit-based credit cards',
 })
+export type AccountInput = z.infer<typeof accountInput>
+
+export const updateAccountInput = accountInput.extend({
+  id: z.string().uuid(),
+})
+export type UpdateAccountInput = z.infer<typeof updateAccountInput>
+
+export function inputTagIds(input: { tag_ids?: string[]; category_id?: string }) {
+  return [...new Set(input.tag_ids ?? (input.category_id ? [input.category_id] : []))]
+}

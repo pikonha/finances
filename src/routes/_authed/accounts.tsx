@@ -1,10 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { createAccount, deleteAccount, listAccounts } from "#/server/accounts";
+import { Pencil, Save, X } from "lucide-react";
+import {
+  createAccount,
+  deleteAccount,
+  listAccounts,
+  updateAccount,
+} from "#/server/accounts";
 import { listFaturas } from "#/server/faturas";
 import { listTransactions } from "#/server/transactions";
 import type { Account, Transaction } from "#/db/schema";
+import type { UpdateAccountInput } from "#/server/schemas";
 import { availableLimit } from "#/lib/faturas";
 import { prepaidBalanceOf } from "#/lib/money";
 import {
@@ -32,6 +39,14 @@ const money = (c: number) =>
   (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const kindLabel = (k: string) =>
   k === "credit_card" ? "cartão de crédito" : "conta bancária";
+type AccountFormInput = {
+  name: string;
+  kind: "credit_card" | "bank_account";
+  limit?: number;
+  closingDay?: number;
+  dueDay?: number;
+  prepaid?: boolean;
+};
 function Accounts() {
   const qc = useQueryClient(),
     [name, setName] = useState(""),
@@ -40,6 +55,15 @@ function Accounts() {
     [closingDay, setClosingDay] = useState(""),
     [dueDay, setDueDay] = useState(""),
     [prepaid, setPrepaid] = useState(false);
+  const [editId, setEditId] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editKind, setEditKind] = useState<"credit_card" | "bank_account">(
+    "bank_account",
+  );
+  const [editLimit, setEditLimit] = useState("");
+  const [editClosingDay, setEditClosingDay] = useState("");
+  const [editDueDay, setEditDueDay] = useState("");
+  const [editPrepaid, setEditPrepaid] = useState(false);
   const { data = [] } = useQuery({
     queryKey: ["accounts"],
     queryFn: () => listAccounts(),
@@ -53,14 +77,7 @@ function Accounts() {
     queryFn: () => listTransactions(),
   });
   const create = useMutation({
-    mutationFn: (d: {
-      name: string;
-      kind: "credit_card" | "bank_account";
-      limit?: number;
-      closingDay?: number;
-      dueDay?: number;
-      prepaid?: boolean;
-    }) => createAccount({ data: d }),
+    mutationFn: (d: AccountFormInput) => createAccount({ data: d }),
     onMutate: async (input) => {
       await qc.cancelQueries({ queryKey: financeQueryKeys.accounts });
       const previous = qc.getQueryData<Account[]>(financeQueryKeys.accounts);
@@ -92,6 +109,70 @@ function Accounts() {
       qc.setQueryData(financeQueryKeys.accounts, context?.previous),
     onSettled: () =>
       qc.invalidateQueries({ queryKey: financeQueryKeys.accounts }),
+  });
+  const clearEdit = () => {
+    setEditId("");
+    setEditName("");
+    setEditKind("bank_account");
+    setEditLimit("");
+    setEditClosingDay("");
+    setEditDueDay("");
+    setEditPrepaid(false);
+  };
+  const beginEdit = (account: Account) => {
+    setEditId(account.id);
+    setEditName(account.name);
+    setEditKind(account.kind);
+    setEditLimit(account.limit == null ? "" : String(account.limit / 100));
+    setEditClosingDay(account.closingDay == null ? "" : String(account.closingDay));
+    setEditDueDay(account.dueDay == null ? "" : String(account.dueDay));
+    setEditPrepaid(account.prepaid);
+  };
+  const editedInput = (): UpdateAccountInput => ({
+    id: editId,
+    name: editName.trim(),
+    kind: editKind,
+    limit:
+      editKind === "credit_card" && !editPrepaid && editLimit
+        ? Math.round(Number(editLimit) * 100)
+        : undefined,
+    closingDay:
+      editKind === "credit_card" && !editPrepaid && editClosingDay
+        ? Number(editClosingDay)
+        : undefined,
+    dueDay:
+      editKind === "credit_card" && !editPrepaid && editDueDay
+        ? Number(editDueDay)
+        : undefined,
+    prepaid: editKind === "credit_card" ? editPrepaid : undefined,
+  });
+  const update = useMutation({
+    mutationFn: (input: UpdateAccountInput) => updateAccount({ data: input }),
+    onMutate: async (input) => {
+      await qc.cancelQueries({ queryKey: financeQueryKeys.accounts });
+      const previous = qc.getQueryData<Account[]>(financeQueryKeys.accounts);
+      qc.setQueryData<Account[]>(
+        financeQueryKeys.accounts,
+        (current = []) =>
+          current
+            .map((account) =>
+              account.id === input.id
+                ? optimisticAccount(input, account.id)
+                : account,
+            )
+            .sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      return { previous };
+    },
+    onSuccess: clearEdit,
+    onError: (_error, _input, context) =>
+      qc.setQueryData(financeQueryKeys.accounts, context?.previous),
+    onSettled: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: financeQueryKeys.accounts }),
+        qc.invalidateQueries({ queryKey: financeQueryKeys.transactions }),
+        qc.invalidateQueries({ queryKey: financeQueryKeys.faturas }),
+      ]),
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteAccount({ data: { id } }),
@@ -296,12 +377,132 @@ function Accounts() {
                 )}
                 <Button
                   className="ml-auto"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => beginEdit(a)}
+                >
+                  <Pencil className="size-4" />
+                  Editar
+                </Button>
+                <Button
                   variant="destructive"
                   size="sm"
                   onClick={() => remove.mutate(a.id)}
                 >
                   Excluir
                 </Button>
+                {editId === a.id && (
+                  <form
+                    className="grid w-full gap-4 border-t-2 border-foreground pt-3 sm:grid-cols-3"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      update.mutate(editedInput());
+                    }}
+                  >
+                    <div className="space-y-2">
+                      <Label>Nome</Label>
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`account-kind-${a.id}`}>Tipo</Label>
+                      <Select
+                        value={editKind}
+                        onValueChange={(value) =>
+                          setEditKind(value as typeof editKind)
+                        }
+                      >
+                        <SelectTrigger id={`account-kind-${a.id}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bank_account">
+                            Conta bancária
+                          </SelectItem>
+                          <SelectItem value="credit_card">
+                            Cartão de crédito
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {editKind === "credit_card" && (
+                      <div className="flex items-end">
+                        <Label
+                          htmlFor={`prepaid-${a.id}`}
+                          className="flex min-h-10 cursor-pointer items-center gap-3 uppercase"
+                        >
+                          <Checkbox
+                            id={`prepaid-${a.id}`}
+                            checked={editPrepaid}
+                            onChange={(e) => setEditPrepaid(e.target.checked)}
+                          />
+                          Cartão pré-pago
+                        </Label>
+                      </div>
+                    )}
+                    {editKind === "credit_card" && !editPrepaid && (
+                      <div className="space-y-2">
+                        <Label>Limite (R$)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step=".01"
+                          value={editLimit}
+                          onChange={(e) => setEditLimit(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    {editKind === "credit_card" && !editPrepaid && (
+                      <div className="space-y-2">
+                        <Label>Dia de fechamento</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="28"
+                          value={editClosingDay}
+                          onChange={(e) => setEditClosingDay(e.target.value)}
+                          required
+                        />
+                      </div>
+                    )}
+                    {editKind === "credit_card" && !editPrepaid && (
+                      <div className="space-y-2">
+                        <Label>Dia de vencimento</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="28"
+                          value={editDueDay}
+                          onChange={(e) => setEditDueDay(e.target.value)}
+                          required
+                        />
+                      </div>
+                    )}
+                    <div className="flex gap-2 sm:col-span-3">
+                      <Button disabled={update.isPending}>
+                        <Save className="size-4" />
+                        Salvar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={update.isPending}
+                        onClick={clearEdit}
+                      >
+                        <X className="size-4" />
+                        Cancelar
+                      </Button>
+                    </div>
+                    {update.error && (
+                      <p className="text-sm text-destructive sm:col-span-3">
+                        {update.error.message}
+                      </p>
+                    )}
+                  </form>
+                )}
               </div>
             );
           })}

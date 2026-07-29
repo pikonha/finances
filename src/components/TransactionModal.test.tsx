@@ -13,7 +13,7 @@ import { TransactionModal } from "./TransactionModal";
 afterEach(cleanup);
 
 const categories = [
-  { id: "11111111-1111-4111-8111-111111111111", name: "Groceries" },
+  { id: "11111111-1111-4111-8111-111111111111", name: "Groceries", color: "#2563eb" },
 ];
 const accounts = [
   {
@@ -56,9 +56,14 @@ describe("TransactionModal", () => {
     expect((amountInput as HTMLInputElement).value.replace(/\s/g, " ")).toBe(
       "R$ 12,34"
     );
+    expect(
+      within(dialog)
+        .getByRole("button", { name: "Etiquetas: Nenhuma" })
+        .closest(".grid")
+    ).toBe(within(dialog).getByLabelText("Repetir").closest(".grid"));
     expect(within(dialog).getByLabelText("Data").tagName).toBe("BUTTON");
     fireEvent.click(
-      within(dialog).getByRole("button", { name: "Categoria: Nenhuma" })
+      within(dialog).getByRole("button", { name: "Etiquetas: Nenhuma" })
     );
     fireEvent.click(within(dialog).getByRole("option", { name: "Groceries" }));
     fireEvent.click(within(dialog).getByLabelText("Conta"));
@@ -77,7 +82,7 @@ describe("TransactionModal", () => {
         type: "earn",
         amount: 1234,
         date: initialDate,
-        category_id: categories[0].id,
+        tag_ids: [categories[0].id],
         account_id: accounts[0].id,
         note: "Paycheck",
         recurrence: undefined,
@@ -120,6 +125,73 @@ describe("TransactionModal", () => {
           installments: undefined,
         })
       )
+    );
+  });
+
+  it("opens edit mode with the transaction already filled", async () => {
+    const onUpdate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <TransactionModal
+        type="expend"
+        accounts={accounts}
+        categories={categories}
+        trigger={<button type="button">Editar</button>}
+        initialTransaction={{
+          id: "33333333-3333-4333-8333-333333333333",
+          type: "expend",
+          amount: 4567,
+          date: "2026-07-15",
+          tags: [{ id: categories[0].id }],
+          accountId: accounts[0].id,
+          note: "Lunch",
+        }}
+        onUpdate={onUpdate}
+        onCreateCategory={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar" }));
+    const dialog = screen.getByRole("dialog");
+
+    expect(within(dialog).getByRole("heading").textContent).toBe(
+      "Editar transação"
+    );
+    expect(within(dialog).queryByLabelText("Repetir")).toBeNull();
+    expect((within(dialog).getByLabelText("Nome") as HTMLInputElement).value).toBe(
+      "Lunch"
+    );
+    expect(
+      (
+        within(dialog).getByLabelText("Valor (R$)") as HTMLInputElement
+      ).value.replace(/\s/g, " ")
+    ).toBe("R$ 45,67");
+    expect(within(dialog).getByLabelText("Data").textContent).toContain(
+      "15/07/2026"
+    );
+    expect(within(dialog).getByLabelText("Tipo").textContent).toContain(
+      "Despesa"
+    );
+    expect(within(dialog).getByLabelText("Conta").textContent).toContain(
+      "Checking"
+    );
+
+    fireEvent.change(within(dialog).getByLabelText("Nome"), {
+      target: { value: "Updated lunch" },
+    });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Salvar transação" })
+    );
+
+    await waitFor(() =>
+      expect(onUpdate).toHaveBeenCalledWith({
+        id: "33333333-3333-4333-8333-333333333333",
+        type: "expend",
+        amount: 4567,
+        date: "2026-07-15",
+        tag_ids: [categories[0].id],
+        account_id: accounts[0].id,
+        note: "Updated lunch",
+      })
     );
   });
 

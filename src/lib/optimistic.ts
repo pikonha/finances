@@ -1,8 +1,11 @@
-import type { Account, Category, Transaction } from "#/db/schema";
+import type { Account, Category, Tag, Transaction } from "#/db/schema";
 import type {
   CreateTransactionInput,
   TransferInput,
+  UpdateTransactionInput,
 } from "#/server/schemas";
+import { transferNote } from "./transaction-labels";
+import { DEFAULT_TAG_COLOR } from "./tag-colors";
 
 export const financeQueryKeys = {
   accounts: ["accounts"] as const,
@@ -18,6 +21,7 @@ export const liveFinanceQuery = {
   refetchIntervalInBackground: true,
   staleTime: 1_000,
 } as const;
+export type TransactionRow = Transaction & { tags: Tag[] };
 
 export function optimisticId() {
   return `optimistic-${crypto.randomUUID()}`;
@@ -26,14 +30,13 @@ export function optimisticId() {
 export function optimisticTransaction(
   input: CreateTransactionInput,
   id = optimisticId(),
-): Transaction {
+): TransactionRow {
   return {
     id,
     userId: "optimistic",
     type: input.type,
     amount: input.amount,
     date: input.date,
-    categoryId: input.category_id ?? null,
     accountId: input.account_id ?? null,
     counterAccountId: null,
     installmentPlanId: null,
@@ -41,13 +44,28 @@ export function optimisticTransaction(
     periodKey: null,
     note: input.note ?? null,
     createdAt: new Date(),
+    tags: [],
+  };
+}
+
+export function optimisticUpdatedTransaction(
+  current: TransactionRow,
+  input: UpdateTransactionInput,
+): TransactionRow {
+  return {
+    ...current,
+    type: input.type,
+    amount: input.amount,
+    date: input.date,
+    accountId: input.account_id ?? null,
+    note: input.note ?? null,
   };
 }
 
 export function optimisticTransfer(
   input: TransferInput,
   id = optimisticId(),
-): Transaction {
+): TransactionRow {
   return {
     ...optimisticTransaction(
       {
@@ -55,7 +73,7 @@ export function optimisticTransfer(
         amount: input.amount,
         date: input.date,
         account_id: input.account_id,
-        note: input.note,
+        note: transferNote(input.note),
       },
       id,
     ),
@@ -92,10 +110,11 @@ export function optimisticAccount(
 export function optimisticCategory(
   name: string,
   id = optimisticId(),
+  color: string = DEFAULT_TAG_COLOR,
 ): Category {
-  return { id, userId: "optimistic", name };
+  return { id, userId: "optimistic", name, color };
 }
 
-export function newestTransactions(rows: Transaction[]) {
+export function newestTransactions<T extends { date: string }>(rows: T[]) {
   return [...rows].sort((a, b) => b.date.localeCompare(a.date));
 }

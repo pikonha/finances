@@ -2,12 +2,13 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ReportCharts } from "./ReportCharts";
-import type { Category, Transaction } from "#/db/schema";
+import type { Category } from "#/db/schema";
 import type { FaturaRow } from "#/server/faturas.core";
+import type { TransactionRow } from "#/server/transactions";
 
 afterEach(cleanup);
 
-const category: Category = { id: "cat-1", userId: "u1", name: "Mercado" };
+const category: Category = { id: "cat-1", userId: "u1", name: "Mercado", color: "#2563eb" };
 
 // The default report period is the current month, so fixtures are relative to it.
 const now = new Date();
@@ -18,14 +19,13 @@ const dayLastMonth = (day: number) => {
   const date = new Date(now.getFullYear(), now.getMonth() - 1, day);
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(day)}`;
 };
-function tx(overrides: Partial<Transaction>): Transaction {
+function tx(overrides: Partial<TransactionRow>): TransactionRow {
   return {
     id: "t1",
     userId: "u1",
     type: "expend",
     amount: 1000,
     date: dayThisMonth(10),
-    categoryId: null,
     accountId: null,
     counterAccountId: null,
     installmentPlanId: null,
@@ -33,6 +33,7 @@ function tx(overrides: Partial<Transaction>): Transaction {
     periodKey: null,
     note: null,
     createdAt: null,
+    tags: [],
     ...overrides,
   };
 }
@@ -40,8 +41,8 @@ function tx(overrides: Partial<Transaction>): Transaction {
 describe("ReportCharts", () => {
   it("renders category breakdown, next fatura and committed timeline", () => {
     const transactions = [
-      tx({ id: "t1", type: "expend", amount: 5000, categoryId: "cat-1" }),
-      tx({ id: "t2", type: "earn", amount: 9000, categoryId: null }),
+      tx({ id: "t1", type: "expend", amount: 5000, tags: [category] }),
+      tx({ id: "t2", type: "earn", amount: 9000 }),
     ];
     const faturas: FaturaRow[] = [
       {

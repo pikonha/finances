@@ -17,6 +17,21 @@ function Harness({ initialValue = "2026-07-15" }) {
   );
 }
 
+function TopPlacementHarness() {
+  const [value, setValue] = useState("2026-07-15");
+  return (
+    <div>
+      <label htmlFor="top-date">Data</label>
+      <DatePicker
+        id="top-date"
+        value={value}
+        onChange={setValue}
+        calendarPlacement="top"
+      />
+    </div>
+  );
+}
+
 describe("DatePicker", () => {
   it("selects a date while preserving the YYYY-MM-DD contract", () => {
     render(<Harness />);
@@ -95,5 +110,14 @@ describe("DatePicker", () => {
     expect(
       screen.getByRole("heading", { name: "agosto de 2026" }),
     ).toBeTruthy();
+  });
+
+  it("can place the calendar above the trigger", () => {
+    render(<TopPlacementHarness />);
+    fireEvent.click(screen.getByLabelText("Data"));
+
+    expect(screen.getByRole("dialog", { name: "Escolher data" }).className).toContain(
+      "bottom-full",
+    );
   });
 });

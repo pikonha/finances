@@ -7,7 +7,9 @@ import {
   faturaPayment,
   installmentPlan,
   recurrenceRule,
+  recurrenceRuleTag,
   transaction,
+  transactionTag,
 } from './schema'
 import { cycleKeyFor, vencimentoFor } from '../lib/faturas'
 import { addMonths, splitInstallments } from '../lib/installments'
@@ -22,8 +24,10 @@ type SeedData = {
   categories: InferInsertModel<typeof category>[]
   accounts: InferInsertModel<typeof account>[]
   recurrenceRules: InferInsertModel<typeof recurrenceRule>[]
+  recurrenceRuleTags: InferInsertModel<typeof recurrenceRuleTag>[]
   installmentPlans: InferInsertModel<typeof installmentPlan>[]
   transactions: InferInsertModel<typeof transaction>[]
+  transactionTags: InferInsertModel<typeof transactionTag>[]
   faturaPayments: InferInsertModel<typeof faturaPayment>[]
 }
 
@@ -74,6 +78,7 @@ export function buildSeedData(anchor = new Date().toISOString().slice(0, 10)): S
     ['transport', 'Transport'], ['subscriptions', 'Subscriptions'], ['health', 'Health'],
     ['shopping', 'Shopping'],
   ].map(([key, name]) => ({ id: categoryIds[key as keyof typeof categoryIds], userId: SEED_USER_ID, name }))
+    .map((row, index) => ({ ...row, color: ['#16a34a', '#0891b2', '#d97706', '#2563eb', '#7c3aed', '#dc2626', '#ea580c', '#4f46e5', '#65a30d', '#db2777'][index] }))
 
   const accounts: SeedData['accounts'] = [
     { id: accountIds.checking, userId: SEED_USER_ID, name: 'Main checking', kind: 'bank_account' },
@@ -91,19 +96,31 @@ export function buildSeedData(anchor = new Date().toISOString().slice(0, 10)): S
     },
   ]
 
+  const recurrenceRuleTags: SeedData['recurrenceRuleTags'] = []
+  const nextRule = (
+    values: Omit<InferInsertModel<typeof recurrenceRule>, 'categoryId'> & { categoryId?: string },
+  ): InferInsertModel<typeof recurrenceRule> => {
+    const { categoryId, ...row } = values
+    if (categoryId) recurrenceRuleTags.push({ recurrenceRuleId: row.id!, tagId: categoryId })
+    return row
+  }
+
   const recurrenceRules: SeedData['recurrenceRules'] = [
+    nextRule(
     {
       id: ruleIds.salary, userId: SEED_USER_ID, amount: 850_000, type: 'earn', interval: 'monthly',
       nextRun: monthDate(anchor, 1, 5), categoryId: categoryIds.salary, note: 'Monthly salary',
-    },
+    }),
+    nextRule(
     {
       id: ruleIds.rent, userId: SEED_USER_ID, amount: 220_000, type: 'expend', interval: 'monthly',
       nextRun: monthDate(anchor, 1, 10), categoryId: categoryIds.housing, note: 'Apartment rent',
-    },
+    }),
+    nextRule(
     {
       id: ruleIds.streaming, userId: SEED_USER_ID, amount: 4_990, type: 'expend', interval: 'monthly',
       nextRun: monthDate(anchor, 1, 8), categoryId: categoryIds.subscriptions, note: 'Streaming subscription',
-    },
+    }),
   ]
 
   const installmentAmounts = splitInstallments(749_900, 6)
@@ -113,9 +130,17 @@ export function buildSeedData(anchor = new Date().toISOString().slice(0, 10)): S
   }]
 
   let transactionSequence = 1_000
+  const transactionTags: SeedData['transactionTags'] = []
   const nextTransaction = (
-    values: Omit<InferInsertModel<typeof transaction>, 'id' | 'userId'>,
-  ): InferInsertModel<typeof transaction> => ({ id: uuid(transactionSequence++), userId: SEED_USER_ID, ...values })
+    values: Omit<InferInsertModel<typeof transaction>, 'id' | 'userId' | 'categoryId'> & { categoryId?: string; tagIds?: string[] },
+  ): InferInsertModel<typeof transaction> => {
+    const { categoryId, tagIds = [], ...rowValues } = values
+    const row = { id: uuid(transactionSequence++), userId: SEED_USER_ID, ...rowValues }
+    for (const tagId of [...new Set([...(categoryId ? [categoryId] : []), ...tagIds])]) {
+      transactionTags.push({ transactionId: row.id, tagId })
+    }
+    return row
+  }
 
   const transactions: SeedData['transactions'] = []
   for (let offset = -5; offset <= 0; offset += 1) {
@@ -218,8 +243,10 @@ export function buildSeedData(anchor = new Date().toISOString().slice(0, 10)): S
     categories,
     accounts,
     recurrenceRules,
+    recurrenceRuleTags,
     installmentPlans,
     transactions,
+    transactionTags,
     faturaPayments,
   }
 }

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
-import { listCategories } from "#/server/categories";
 import {
   listFaturas,
   markFaturaPaid,
@@ -68,10 +67,6 @@ function FaturaDetail() {
     queryKey: ["transactions"],
     queryFn: () => listTransactions(),
   });
-  const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
-    queryFn: () => listCategories(),
-  });
   const { data: plans = [] } = useQuery({
     queryKey: ["installmentPlans"],
     queryFn: () => listInstallmentPlans(),
@@ -102,10 +97,6 @@ function FaturaDetail() {
             selected.cycleKey
       )
     : [];
-  const categoryNames = useMemo(
-    () => new Map(categories.map((category) => [category.id, category.name])),
-    [categories]
-  );
   const planCounts = useMemo(
     () => new Map(plans.map((plan) => [plan.id, plan.count])),
     [plans]
@@ -300,7 +291,7 @@ function FaturaDetail() {
                 <TableHead>Data</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead>Valor</TableHead>
-                <TableHead>Categoria</TableHead>
+                <TableHead>Etiquetas</TableHead>
                 <TableHead>Parcela</TableHead>
               </TableRow>
             </TableHeader>
@@ -311,9 +302,14 @@ function FaturaDetail() {
                   <TableCell>{expense.note || "—"}</TableCell>
                   <TableCell className="text-destructive">−{money(expense.amount)}</TableCell>
                   <TableCell>
-                    {expense.categoryId
-                      ? categoryNames.get(expense.categoryId) ?? "—"
-                      : "—"}
+                    <div className="flex flex-wrap gap-1">
+                      {expense.tags.map((tag) => (
+                        <Badge key={tag.id} variant="outline" style={{ borderColor: tag.color, color: tag.color }}>
+                          {tag.name}
+                        </Badge>
+                      ))}
+                      {!expense.tags.length && "—"}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {expense.installmentPlanId ? (

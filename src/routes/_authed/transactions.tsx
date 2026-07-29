@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { listAccounts } from "#/server/accounts";
 import { createCategory, listCategories } from "#/server/categories";
 import {
@@ -12,21 +12,32 @@ import {
   listInstallmentPlans,
   listRecurrenceRules,
   listTransactions,
+  updateTransaction,
 } from "#/server/transactions";
-import type { CreateTransactionInput, TransferInput } from "#/server/schemas";
+import type {
+  CreateTransactionInput,
+  TransferInput,
+  UpdateTransactionInput,
+} from "#/server/schemas";
 import type { Category, Transaction } from "#/db/schema";
+import type {
+  RecurrenceRuleRow,
+  TransactionRow,
+} from "#/server/transactions";
 import {
   financeQueryKeys,
   newestTransactions,
   optimisticCategory,
   optimisticId,
   optimisticTransaction,
+  optimisticUpdatedTransaction,
   optimisticTransfer,
 } from "#/lib/optimistic";
 import { localMonthKey, scheduledDatesInMonth } from "#/lib/recurrence";
 import { CategorySelect } from "@/components/CategorySelect";
 import { MonthNav } from "@/components/MonthNav";
 import { MoneyInput } from "@/components/MoneyInput";
+import { TransactionModal } from "@/components/TransactionModal";
 import { TransferModal } from "@/components/TransferModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +65,7 @@ import {
 export const Route = createFileRoute("/_authed/transactions")({
   component: Transactions,
 });
+
 type Repeat =
   | "none"
   | "daily"
@@ -61,69 +73,124 @@ type Repeat =
   | "monthly"
   | "yearly"
   | "installments";
-const money = (c: number) =>
-  (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+type DisplayRow =
+  | {
+      kind: "transaction";
+      key: string;
+      date: string;
+      type: Transaction["type"];
+      amount: number;
+      note: string | null;
+      tags: TransactionRow["tags"];
+      account?: string;
+      counterAccount: string | null;
+      badges: string[];
+      installmentLabel: string | null;
+      isRecurring: boolean;
+      pending: boolean;
+      tx: TransactionRow;
+      onDelete: () => void;
+    }
+  | {
+      kind: "scheduled";
+      key: string;
+      date: string;
+      type: RecurrenceRuleRow["type"];
+      amount: number;
+      note: string | null;
+      tags: RecurrenceRuleRow["tags"];
+      account?: string;
+      counterAccount: null;
+      badges: string[];
+      installmentLabel: null;
+      isRecurring: boolean;
+      pending: boolean;
+      onDelete: () => void;
+    };
+
+const money = (cents: number) =>
+  (cents / 100).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+
 const dayLabel = (date: string) =>
   new Date(date + "T00:00:00Z").toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     timeZone: "UTC",
   });
+
 const weekdayLabel = (date: string) =>
   new Date(date + "T00:00:00Z").toLocaleDateString("pt-BR", {
     weekday: "short",
     timeZone: "UTC",
   });
 
+const kindLabel = (kind: string) =>
+  kind === "credit_card" ? "cartão de crédito" : "conta bancária";
+
+const signedPrefix = (type: Transaction["type"]) =>
+  type === "earn" ? "+" : type === "expend" ? "−" : "";
+
 function Transactions() {
   const qc = useQueryClient();
   const { data: transactions = [] } = useQuery({
-    queryKey: ["transactions"],
+    queryKey: financeQueryKeys.transactions,
     queryFn: () => listTransactions(),
   });
   const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
+    queryKey: financeQueryKeys.categories,
     queryFn: () => listCategories(),
   });
   const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts"],
+    queryKey: financeQueryKeys.accounts,
     queryFn: () => listAccounts(),
   });
   const { data: plans = [] } = useQuery({
-    queryKey: ["installmentPlans"],
+    queryKey: financeQueryKeys.installmentPlans,
     queryFn: () => listInstallmentPlans(),
   });
   const { data: recurrenceRules = [] } = useQuery({
     queryKey: financeQueryKeys.recurrenceRules,
     queryFn: () => listRecurrenceRules(),
   });
-  const [type, setType] = useState<"earn" | "expend">("expend"),
-    [amount, setAmount] = useState<number | null>(null),
-    [date, setDate] = useState(localDateKey),
-    [categoryId, setCategoryId] = useState(""),
-    [accountId, setAccountId] = useState(""),
-    [note, setNote] = useState(""),
-    [repeat, setRepeat] = useState<Repeat>("none"),
-    [count, setCount] = useState("2");
-  const selected = accounts.find((a) => a.id === accountId);
+  const [type, setType] = useState<"earn" | "expend">("expend");
+  const [amount, setAmount] = useState<number | null>(null);
+  const [date, setDate] = useState(localDateKey);
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const [accountId, setAccountId] = useState("");
+  const [note, setNote] = useState("");
+  const [repeat, setRepeat] = useState<Repeat>("none");
+  const [count, setCount] = useState("2");
+  const [activeMonth, setActiveMonth] = useState(localMonthKey);
+  const [filterAccount, setFilterAccount] = useState("");
+
+  const selected = accounts.find((account) => account.id === accountId);
   const canInstall = type === "expend" && selected?.kind === "credit_card";
+
   useEffect(() => {
     if (repeat === "installments" && !canInstall) setRepeat("monthly");
   }, [repeat, canInstall]);
+
   const refresh = () =>
     Promise.all([
       qc.invalidateQueries({ queryKey: financeQueryKeys.transactions }),
+      qc.invalidateQueries({ queryKey: financeQueryKeys.accounts }),
+      qc.invalidateQueries({ queryKey: financeQueryKeys.faturas }),
       qc.invalidateQueries({ queryKey: financeQueryKeys.installmentPlans }),
       qc.invalidateQueries({ queryKey: financeQueryKeys.recurrenceRules }),
     ]);
+
   const create = useMutation({
     mutationFn: (data: CreateTransactionInput) => createTransaction({ data }),
     onMutate: async (data) => {
       await qc.cancelQueries({ queryKey: financeQueryKeys.transactions });
-      const previous = qc.getQueryData<Transaction[]>(
+      const previous = qc.getQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
       );
-      qc.setQueryData<Transaction[]>(
+      qc.setQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
         (current = []) =>
           newestTransactions([optimisticTransaction(data), ...current]),
@@ -139,22 +206,49 @@ function Transactions() {
     },
     onSettled: refresh,
   });
+
+  const update = useMutation({
+    mutationFn: (data: UpdateTransactionInput) => updateTransaction({ data }),
+    onMutate: async (data) => {
+      await qc.cancelQueries({ queryKey: financeQueryKeys.transactions });
+      const previous = qc.getQueryData<TransactionRow[]>(
+        financeQueryKeys.transactions,
+      );
+      qc.setQueryData<TransactionRow[]>(
+        financeQueryKeys.transactions,
+        (current = []) =>
+          newestTransactions(
+            current.map((transaction) =>
+              transaction.id === data.id
+                ? optimisticUpdatedTransaction(transaction, data)
+                : transaction,
+            ),
+          ),
+      );
+      return { previous };
+    },
+    onError: (_error, _data, context) =>
+      qc.setQueryData(financeQueryKeys.transactions, context?.previous),
+    onSettled: refresh,
+  });
+
   const createCategoryMutation = useMutation({
-    mutationFn: (name: string) => createCategory({ data: { name } }),
-    onMutate: async (name) => {
+    mutationFn: (data: { name: string; color: string }) =>
+      createCategory({ data }),
+    onMutate: async ({ name, color }) => {
       await qc.cancelQueries({ queryKey: financeQueryKeys.categories });
       const previous = qc.getQueryData<Category[]>(financeQueryKeys.categories);
       const temporaryId = optimisticId();
       qc.setQueryData<Category[]>(
         financeQueryKeys.categories,
         (current = []) =>
-          [...current, optimisticCategory(name, temporaryId)].sort((a, b) =>
-            a.name.localeCompare(b.name),
+          [...current, optimisticCategory(name, temporaryId, color)].sort(
+            (a, b) => a.name.localeCompare(b.name),
           ),
       );
       return { previous, temporaryId };
     },
-    onSuccess: ({ id }, _name, context) =>
+    onSuccess: ({ id }, _data, context) =>
       qc.setQueryData<Category[]>(
         financeQueryKeys.categories,
         (current = []) =>
@@ -164,19 +258,20 @@ function Transactions() {
               : category,
           ),
       ),
-    onError: (_error, _name, context) =>
+    onError: (_error, _data, context) =>
       qc.setQueryData(financeQueryKeys.categories, context?.previous),
     onSettled: () =>
       qc.invalidateQueries({ queryKey: financeQueryKeys.categories }),
   });
+
   const removeTx = useMutation({
     mutationFn: (id: string) => deleteTransaction({ data: { id } }),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: financeQueryKeys.transactions });
-      const previous = qc.getQueryData<Transaction[]>(
+      const previous = qc.getQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
       );
-      qc.setQueryData<Transaction[]>(
+      qc.setQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
         (current = []) => current.filter((transaction) => transaction.id !== id),
       );
@@ -186,18 +281,20 @@ function Transactions() {
       qc.setQueryData(financeQueryKeys.transactions, context?.previous),
     onSettled: refresh,
   });
+
   const removeRule = useMutation({
     mutationFn: (id: string) => deleteRecurrenceRule({ data: { id } }),
     onSettled: refresh,
   });
+
   const transfer = useMutation({
     mutationFn: (data: TransferInput) => createTransfer({ data }),
     onMutate: async (data) => {
       await qc.cancelQueries({ queryKey: financeQueryKeys.transactions });
-      const previous = qc.getQueryData<Transaction[]>(
+      const previous = qc.getQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
       );
-      qc.setQueryData<Transaction[]>(
+      qc.setQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
         (current = []) =>
           newestTransactions([optimisticTransfer(data), ...current]),
@@ -209,21 +306,16 @@ function Transactions() {
     onSettled: refresh,
   });
 
-  // Calendar navigation is independent of existing rows, so empty and future
-  // months remain reachable.
-  const [activeMonth, setActiveMonth] = useState(localMonthKey);
-  const [filterAccount, setFilterAccount] = useState("");
   const monthTx = transactions.filter(
-    (t) =>
-      t.date.slice(0, 7) === activeMonth &&
-      // transferência aparece nas duas contas envolvidas
+    (transaction) =>
+      transaction.date.slice(0, 7) === activeMonth &&
       (!filterAccount ||
-        t.accountId === filterAccount ||
-        t.counterAccountId === filterAccount),
+        transaction.accountId === filterAccount ||
+        transaction.counterAccountId === filterAccount),
   );
+
   const scheduled = useMemo(
     () =>
-      // ponytail: recurrence_rule não tem conta, então some ao filtrar
       filterAccount
         ? []
         : recurrenceRules.flatMap((rule) =>
@@ -233,66 +325,70 @@ function Transactions() {
           ),
     [activeMonth, recurrenceRules, filterAccount],
   );
-  // installment payment position: x/y where y=plan.count, x=1-based order within the plan.
+
   const accountName = useMemo(
-    () => new Map(accounts.map((a) => [a.id, a.name])),
+    () => new Map(accounts.map((account) => [account.id, account.name])),
     [accounts],
   );
-  const categoryName = useMemo(
-    () => new Map(categories.map((c) => [c.id, c.name])),
-    [categories],
-  );
+
   const planCount = useMemo(
-    () => new Map(plans.map((p) => [p.id, p.count])),
-    [plans]
+    () => new Map(plans.map((plan) => [plan.id, plan.count])),
+    [plans],
   );
+
   const installIndex = useMemo(() => {
-    const groups = new Map<string, typeof transactions>();
-    for (const tx of transactions)
-      if (tx.installmentPlanId) {
-        const g = groups.get(tx.installmentPlanId) ?? [];
-        g.push(tx);
-        groups.set(tx.installmentPlanId, g);
-      }
-    const idx = new Map<string, number>();
-    for (const g of groups.values()) {
-      g.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-      g.forEach((t, i) => idx.set(t.id, i + 1));
+    const groups = new Map<string, TransactionRow[]>();
+    for (const transaction of transactions) {
+      if (!transaction.installmentPlanId) continue;
+      const group = groups.get(transaction.installmentPlanId) ?? [];
+      group.push(transaction);
+      groups.set(transaction.installmentPlanId, group);
     }
-    return idx;
+    const index = new Map<string, number>();
+    for (const group of groups.values()) {
+      group.sort((a, b) => a.date.localeCompare(b.date));
+      group.forEach((transaction, position) =>
+        index.set(transaction.id, position + 1),
+      );
+    }
+    return index;
   }, [transactions]);
-  // transações e recorrências agendadas numa única lista, mais recente primeiro
-  const rows = [
-    ...monthTx.map((tx) => ({
+
+  const rows: DisplayRow[] = [
+    ...monthTx.map((tx): DisplayRow => ({
+      kind: "transaction",
       key: tx.id,
       date: tx.date,
       type: tx.type,
       amount: tx.amount,
       note: tx.note,
-      category: categoryName.get(tx.categoryId ?? ""),
+      tags: tx.tags,
       account: accountName.get(tx.accountId ?? ""),
       counterAccount: tx.counterAccountId
         ? (accountName.get(tx.counterAccountId) ?? "—")
         : null,
-      badges: [
-        tx.installmentPlanId &&
-          `${installIndex.get(tx.id)}/${planCount.get(tx.installmentPlanId)}`,
-        tx.recurrenceRuleId && "recorrente",
-      ].filter(Boolean) as string[],
+      badges: [],
+      installmentLabel: tx.installmentPlanId
+        ? `${installIndex.get(tx.id)}/${planCount.get(tx.installmentPlanId)}`
+        : null,
+      isRecurring: Boolean(tx.recurrenceRuleId),
       pending: false,
+      tx,
       onDelete: () => removeTx.mutate(tx.id),
     })),
-    ...scheduled.map(({ rule, date }) => ({
+    ...scheduled.map(({ rule, date }): DisplayRow => ({
+      kind: "scheduled",
       key: `scheduled-${rule.id}-${date}`,
       date,
       type: rule.type,
       amount: rule.amount,
       note: rule.note,
-      category: categoryName.get(rule.categoryId ?? ""),
-      // ponytail: recurrence_rule não tem conta
+      tags: rule.tags,
       account: undefined,
       counterAccount: null,
-      badges: ["agendada", "recorrente"],
+      badges: ["agendada"],
+      installmentLabel: null,
+      isRecurring: true,
       pending: removeRule.isPending,
       onDelete: () => removeRule.mutate(rule.id),
     })),
@@ -311,6 +407,7 @@ function Transactions() {
           }}
         />
       </div>
+
       <Card className="mb-6">
         <CardHeader>
           <CardTitle>Adicionar transação</CardTitle>
@@ -318,14 +415,14 @@ function Transactions() {
         <CardContent>
           <form
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            onSubmit={(e) => {
-              e.preventDefault();
+            onSubmit={(event) => {
+              event.preventDefault();
               if (amount === null || amount <= 0) return;
               create.mutate({
                 type,
                 amount,
                 date,
-                category_id: categoryId || undefined,
+                tag_ids: tagIds.length ? tagIds : undefined,
                 account_id: accountId || undefined,
                 note: note || undefined,
                 recurrence:
@@ -343,7 +440,7 @@ function Transactions() {
               <Input
                 value={note}
                 maxLength={500}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(event) => setNote(event.target.value)}
               />
             </Field>
             <Field label="Tipo">
@@ -361,11 +458,7 @@ function Transactions() {
               </Select>
             </Field>
             <Field label="Valor (R$)">
-              <MoneyInput
-                value={amount}
-                onValueChange={setAmount}
-                required
-              />
+              <MoneyInput value={amount} onValueChange={setAmount} required />
             </Field>
             <Field label="Data" htmlFor="transaction-page-date">
               <DatePicker
@@ -375,13 +468,13 @@ function Transactions() {
                 required
               />
             </Field>
-            <Field label="Categoria">
+            <Field label="Etiquetas">
               <CategorySelect
                 categories={categories}
-                value={categoryId}
-                onChange={setCategoryId}
-                onCreate={async (name) =>
-                  (await createCategoryMutation.mutateAsync(name)).id
+                value={tagIds}
+                onChange={setTagIds}
+                onCreate={async (name, color) =>
+                  (await createCategoryMutation.mutateAsync({ name, color })).id
                 }
               />
             </Field>
@@ -397,11 +490,11 @@ function Transactions() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={EMPTY_SELECT_VALUE}>Nenhuma</SelectItem>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
-                  </SelectItem>
-                ))}
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name} · {kindLabel(account.kind)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>
@@ -432,7 +525,7 @@ function Transactions() {
                   min="2"
                   max="60"
                   value={count}
-                  onChange={(e) => setCount(e.target.value)}
+                  onChange={(event) => setCount(event.target.value)}
                 />
               </Field>
             )}
@@ -449,6 +542,7 @@ function Transactions() {
           </form>
         </CardContent>
       </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Todas as transações</CardTitle>
@@ -456,7 +550,6 @@ function Transactions() {
         <CardContent>
           <div className="relative mb-4 flex flex-wrap items-center justify-center gap-4">
             <MonthNav month={activeMonth} onChange={setActiveMonth} />
-            {/* absoluto no desktop pra não desalinhar o seletor de mês do centro */}
             <div className="w-full sm:absolute sm:inset-y-0 sm:right-0 sm:flex sm:w-auto sm:items-center">
               <Select
                 value={filterAccount || EMPTY_SELECT_VALUE}
@@ -474,89 +567,143 @@ function Transactions() {
                   <SelectItem value={EMPTY_SELECT_VALUE}>
                     Todas as contas
                   </SelectItem>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>
-                      {a.name}
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
+
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-20">Data</TableHead>
                 <TableHead>Descrição</TableHead>
-                <TableHead className="hidden sm:table-cell">Categoria</TableHead>
+                <TableHead className="hidden sm:table-cell">Etiquetas</TableHead>
                 <TableHead className="hidden md:table-cell">Conta</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="w-10" />
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.map((row) => (
                 <TableRow key={row.key}>
-                  <TableCell className="align-top tabular-nums">
-                    <div className="font-medium">{dayLabel(row.date)}</div>
-                    <div className="text-xs capitalize text-muted-foreground">
-                      {weekdayLabel(row.date)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="max-w-[16rem] whitespace-normal align-top">
-                    <span
-                      className={
-                        row.note ? "font-medium" : "text-muted-foreground"
-                      }
-                    >
-                      {row.note || "Sem descrição"}
-                    </span>
-                    {row.badges.length > 0 && (
-                      <span className="ml-2 inline-flex gap-1 align-middle">
+                    <TableCell className="align-top tabular-nums">
+                      <div className="font-medium">{dayLabel(row.date)}</div>
+                      <div className="text-xs capitalize text-muted-foreground">
+                        {weekdayLabel(row.date)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-[16rem] whitespace-normal align-top">
+                      <div className="flex flex-wrap items-center gap-1">
                         {row.badges.map((badge) => (
                           <Badge key={badge} variant="outline">
                             {badge}
                           </Badge>
                         ))}
-                      </span>
-                    )}
-                    {/* conta e categoria viram linha secundária onde as colunas somem */}
-                    <div className="text-xs text-muted-foreground md:hidden">
-                      <span className="sm:hidden">{row.category ?? "—"} · </span>
+                      </div>
+                      <div
+                        className={
+                          row.note
+                            ? "mt-1 font-medium"
+                            : "mt-1 text-muted-foreground"
+                        }
+                      >
+                        {row.note || "Sem descrição"}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground md:hidden">
+                        <span className="sm:hidden">
+                          {row.tags.length
+                            ? row.tags.map((tag) => tag.name).join(", ")
+                            : "—"}{" "}
+                          ·{" "}
+                        </span>
+                        {row.account ?? "—"}
+                        {row.counterAccount && ` → ${row.counterAccount}`}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden align-top sm:table-cell">
+                      <TagList tags={row.tags} />
+                    </TableCell>
+                    <TableCell className="hidden align-top text-muted-foreground md:table-cell">
                       {row.account ?? "—"}
                       {row.counterAccount && ` → ${row.counterAccount}`}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden align-top text-muted-foreground sm:table-cell">
-                    {row.category ?? "—"}
-                  </TableCell>
-                  <TableCell className="hidden align-top text-muted-foreground md:table-cell">
-                    {row.account ?? "—"}
-                    {row.counterAccount && ` → ${row.counterAccount}`}
-                  </TableCell>
-                  <TableCell
-                    className={`align-top text-right font-bold tabular-nums ${
-                      row.type === "earn"
-                        ? "text-emerald-600"
-                        : "text-destructive"
-                    }`}
-                  >
-                    {row.type === "earn" ? "+" : "−"}
-                    {money(row.amount)}
-                  </TableCell>
-                  <TableCell className="align-top">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Excluir"
-                      className="size-8 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                      disabled={row.pending}
-                      onClick={row.onDelete}
+                    </TableCell>
+                    <TableCell
+                      className={`align-top text-right font-bold tabular-nums ${
+                        row.type === "earn"
+                          ? "text-emerald-600"
+                          : row.type === "expend"
+                            ? "text-destructive"
+                            : ""
+                      }`}
                     >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {row.isRecurring && (
+                          <RefreshCw
+                            aria-label="recorrente"
+                            className="size-3.5 text-muted-foreground"
+                          />
+                        )}
+                        {row.installmentLabel && (
+                          <span className="text-xs text-muted-foreground">
+                            ({row.installmentLabel})
+                          </span>
+                        )}
+                        <span>
+                          {signedPrefix(row.type)}
+                          {money(row.amount)}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-top">
+                      <div className="flex justify-end gap-2">
+                        {row.kind === "transaction" &&
+                          !row.tx.installmentPlanId &&
+                          row.tx.type !== "transfer" && (
+                            <TransactionModal
+                              type={row.tx.type}
+                              accounts={accounts}
+                              categories={categories}
+                              initialTransaction={row.tx}
+                              onUpdate={(data) => update.mutateAsync(data)}
+                              onCreateCategory={async (name, color) =>
+                                (
+                                  await createCategoryMutation.mutateAsync({
+                                    name,
+                                    color,
+                                  })
+                                ).id
+                              }
+                              trigger={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Editar"
+                                  className="size-8"
+                                >
+                                  <Pencil className="size-4" />
+                                </Button>
+                              }
+                            />
+                          )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Excluir"
+                          className="size-8 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                          disabled={row.pending}
+                          onClick={row.onDelete}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
               ))}
               {rows.length === 0 && (
                 <TableRow>
@@ -575,6 +722,24 @@ function Transactions() {
     </main>
   );
 }
+
+function TagList({ tags }: { tags: TransactionRow["tags"] }) {
+  if (!tags.length) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {tags.map((tag) => (
+        <Badge
+          key={tag.id}
+          variant="outline"
+          style={{ borderColor: tag.color, color: tag.color }}
+        >
+          {tag.name}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
 function Field({
   label,
   htmlFor,

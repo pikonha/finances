@@ -38,9 +38,10 @@ describe("TransferModal", () => {
     fireEvent.change(within(dialog).getByLabelText("Valor (R$)"), {
       target: { value: "12.34" },
     });
-    fireEvent.change(within(dialog).getByLabelText("Data"), {
-      target: { value: "2026-07-19" },
-    });
+    fireEvent.click(within(dialog).getByLabelText("Data"));
+    fireEvent.click(
+      screen.getByRole("gridcell", { name: /19 de julho de 2026/i })
+    );
     fireEvent.click(within(dialog).getByRole("button", { name: "Transferir" }));
 
     await waitFor(() =>
@@ -49,6 +50,7 @@ describe("TransferModal", () => {
         date: "2026-07-19",
         account_id: accounts[0].id,
         counter_account_id: accounts[1].id,
+        note: "Transferência",
       })
     );
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

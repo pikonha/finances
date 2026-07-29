@@ -32,7 +32,7 @@ HERMES_USER_ID=better-auth-user-id-owned-by-hermes-writes
 CRON_SECRET=...
 ```
 
-`HERMES_USER_ID` is the Better Auth user ID assigned to external transaction writes. The webhook contract uses `account_id`; `card_id` is no longer accepted.
+`HERMES_USER_ID` is the Better Auth user ID assigned to external transaction writes. The webhook contract uses `account_id` and optional `tag_ids`; legacy `category_id` is still accepted as one tag. `card_id` is no longer accepted.
 
 ## Commands
 
@@ -63,4 +63,4 @@ The daily cron remains:
 sh -c "curl -fsS -X POST -H \"Authorization: Bearer $CRON_SECRET\" \"$APP_URL/api/cron/materialize-recurrence\""
 ```
 
-The cron materializes rules for every user and remains idempotent. Installments are allowed only for expense transactions on an owned credit-card account.
+The cron materializes rules for every user and remains idempotent. Installments are allowed only for expense transactions on an owned credit-card account. Tags are colored rows attached through `transaction_tag`, so one transaction can carry multiple labels.

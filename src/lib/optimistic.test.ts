@@ -15,7 +15,7 @@ describe("optimistic finance rows", () => {
         amount: 1234,
         date: "2026-07-27",
         account_id: "account",
-        category_id: "category",
+        tag_ids: ["category"],
         note: "Lunch",
       },
       "temporary",
@@ -26,8 +26,8 @@ describe("optimistic finance rows", () => {
       type: "expend",
       amount: 1234,
       accountId: "account",
-      categoryId: "category",
       note: "Lunch",
+      tags: [],
     });
   });
 
@@ -38,6 +38,7 @@ describe("optimistic finance rows", () => {
         date: "2026-07-27",
         account_id: "from",
         counter_account_id: "to",
+        note: "Transferência",
       },
       "temporary",
     );
@@ -46,6 +47,7 @@ describe("optimistic finance rows", () => {
       type: "transfer",
       accountId: "from",
       counterAccountId: "to",
+      note: "Transferência",
     });
   });
 
@@ -60,6 +62,7 @@ describe("optimistic finance rows", () => {
       id: "category",
       userId: "optimistic",
       name: "Food",
+      color: "#2563eb",
     });
   });
 

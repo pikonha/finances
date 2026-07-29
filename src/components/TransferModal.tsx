@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowRightLeft } from "lucide-react";
 import type { TransferInput } from "#/server/schemas";
+import { DEFAULT_TRANSFER_NOTE } from "#/lib/transaction-labels";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { DatePicker, localDateKey } from "./ui/date-picker";
 
 type AccountOption = {
   id: string;
@@ -42,7 +44,7 @@ export function TransferModal({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localDateKey);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,7 +52,7 @@ export function TransferModal({
     setFrom("");
     setTo("");
     setAmount("");
-    setDate(new Date().toISOString().slice(0, 10));
+    setDate(localDateKey());
     setError("");
   };
 
@@ -74,7 +76,7 @@ export function TransferModal({
           {!compact && "Transferir"}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="overflow-visible sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Transferir entre contas</DialogTitle>
           <DialogDescription>
@@ -96,6 +98,7 @@ export function TransferModal({
                 date,
                 account_id: from,
                 counter_account_id: to,
+                note: DEFAULT_TRANSFER_NOTE,
               });
               setOpen(false);
               reset();
@@ -176,12 +179,12 @@ export function TransferModal({
               />
             </Field>
             <Field label="Data" htmlFor="transfer-date">
-              <Input
+              <DatePicker
                 id="transfer-date"
-                type="date"
                 value={date}
-                onChange={(event) => setDate(event.target.value)}
+                onChange={setDate}
                 required
+                calendarPlacement="top"
               />
             </Field>
           </div>

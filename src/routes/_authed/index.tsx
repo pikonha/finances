@@ -11,7 +11,8 @@ import {
   listTransactions,
 } from "#/server/transactions";
 import type { CreateTransactionInput, TransferInput } from "#/server/schemas";
-import type { Category, Transaction } from "#/db/schema";
+import type { Category } from "#/db/schema";
+import type { TransactionRow } from "#/server/transactions";
 import { balanceOf } from "#/lib/money";
 import {
   financeQueryKeys,
@@ -78,10 +79,10 @@ function Dashboard() {
     mutationFn: (data: CreateTransactionInput) => createTransaction({ data }),
     onMutate: async (data) => {
       await queryClient.cancelQueries({ queryKey: financeQueryKeys.transactions });
-      const previous = queryClient.getQueryData<Transaction[]>(
+      const previous = queryClient.getQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
       );
-      queryClient.setQueryData<Transaction[]>(
+      queryClient.setQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
         (current = []) =>
           newestTransactions([optimisticTransaction(data), ...current]),
@@ -99,8 +100,8 @@ function Dashboard() {
       ]),
   });
   const createCategoryMutation = useMutation({
-    mutationFn: (name: string) => createCategory({ data: { name } }),
-    onMutate: async (name) => {
+    mutationFn: (data: { name: string; color: string }) => createCategory({ data }),
+    onMutate: async ({ name, color }) => {
       await queryClient.cancelQueries({ queryKey: financeQueryKeys.categories });
       const previous = queryClient.getQueryData<Category[]>(
         financeQueryKeys.categories,
@@ -109,13 +110,13 @@ function Dashboard() {
       queryClient.setQueryData<Category[]>(
         financeQueryKeys.categories,
         (current = []) =>
-          [...current, optimisticCategory(name, temporaryId)].sort((a, b) =>
+          [...current, optimisticCategory(name, temporaryId, color)].sort((a, b) =>
             a.name.localeCompare(b.name),
           ),
       );
       return { previous, temporaryId };
     },
-    onSuccess: ({ id }, _name, context) =>
+    onSuccess: ({ id }, _data, context) =>
       queryClient.setQueryData<Category[]>(
         financeQueryKeys.categories,
         (current = []) =>
@@ -125,7 +126,7 @@ function Dashboard() {
               : category,
           ),
       ),
-    onError: (_error, _name, context) =>
+    onError: (_error, _data, context) =>
       queryClient.setQueryData(financeQueryKeys.categories, context?.previous),
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: financeQueryKeys.categories }),
@@ -134,10 +135,10 @@ function Dashboard() {
     mutationFn: (data: TransferInput) => createTransfer({ data }),
     onMutate: async (data) => {
       await queryClient.cancelQueries({ queryKey: financeQueryKeys.transactions });
-      const previous = queryClient.getQueryData<Transaction[]>(
+      const previous = queryClient.getQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
       );
-      queryClient.setQueryData<Transaction[]>(
+      queryClient.setQueryData<TransactionRow[]>(
         financeQueryKeys.transactions,
         (current = []) =>
           newestTransactions([optimisticTransfer(data), ...current]),
@@ -185,8 +186,8 @@ function Dashboard() {
             accounts={accounts}
             categories={categories}
             onCreate={(data) => create.mutateAsync(data)}
-            onCreateCategory={async (name) =>
-              (await createCategoryMutation.mutateAsync(name)).id
+            onCreateCategory={async (name, color) =>
+              (await createCategoryMutation.mutateAsync({ name, color })).id
             }
           />
           <TransactionModal
@@ -194,8 +195,8 @@ function Dashboard() {
             accounts={accounts}
             categories={categories}
             onCreate={(data) => create.mutateAsync(data)}
-            onCreateCategory={async (name) =>
-              (await createCategoryMutation.mutateAsync(name)).id
+            onCreateCategory={async (name, color) =>
+              (await createCategoryMutation.mutateAsync({ name, color })).id
             }
           />
           <TransferModal

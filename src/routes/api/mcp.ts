@@ -5,8 +5,9 @@ import { withMcpAuth } from 'better-auth/plugins'
 import { asc, desc, eq } from 'drizzle-orm'
 import { auth } from '#/server/auth-config'
 import { db } from '#/db/index'
-import { account, category, faturaPayment, installmentPlan, recurrenceRule, transaction } from '#/db/schema'
+import { account, faturaPayment, installmentPlan, recurrenceRule, tag, transaction } from '#/db/schema'
 import { assertMoney } from '#/lib/money'
+import { tagColorForIndex } from '#/lib/tag-colors'
 import { accountInput, categoryInput, createTransactionInput, faturaPaymentInput, transferInput } from '#/server/schemas'
 import { createInstallmentPlanCore, createRecurrenceRuleCore, createTransactionCore, createTransferCore } from '#/server/transactions.core'
 import { listFaturasCore } from '#/server/faturas.core'
@@ -40,17 +41,17 @@ function buildServer(userId: string) {
     return text({ id: row.id })
   })
 
-  server.registerTool('list_categories', { description: 'List the categories owned by the authenticated user (seeds defaults on first use)' }, async () => {
-    const query = () => db.select().from(category).where(eq(category.userId, userId)).orderBy(asc(category.name))
+  server.registerTool('list_tags', { description: 'List the colored tags owned by the authenticated user (seeds defaults on first use)' }, async () => {
+    const query = () => db.select().from(tag).where(eq(tag.userId, userId)).orderBy(asc(tag.name))
     const rows = await query()
     if (rows.length) return text(rows)
     const DEFAULTS = ['Groceries', 'Transport', 'Utilities', 'Entertainment', 'Salary']
-    await db.insert(category).values(DEFAULTS.map((name) => ({ userId, name })))
+    await db.insert(tag).values(DEFAULTS.map((name, index) => ({ userId, name, color: tagColorForIndex(index) })))
     return text(await query())
   })
 
-  server.registerTool('create_category', { description: 'Create a category', inputSchema: categoryInput }, async (data) => {
-    const [row] = await db.insert(category).values({ userId, name: data.name }).returning({ id: category.id })
+  server.registerTool('create_tag', { description: 'Create a colored tag', inputSchema: categoryInput }, async (data) => {
+    const [row] = await db.insert(tag).values({ userId, name: data.name, color: data.color }).returning({ id: tag.id })
     return text({ id: row.id })
   })
 

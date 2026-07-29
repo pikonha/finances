@@ -17,6 +17,7 @@ describe('local seed data', () => {
     expect(new Set(allIds)).toHaveLength(allIds.length)
     expect(data.accounts).toHaveLength(5)
     expect(data.categories).toHaveLength(10)
+    expect(data.categories.every(({ color }) => /^#[0-9a-f]{6}$/.test(color))).toBe(true)
     expect(data.transactions.length).toBeGreaterThan(60)
     expect(data.faturaPayments.length).toBeGreaterThan(0)
     expect(data.transactions.some(({ date }) => date > '2026-07-20')).toBe(true)
@@ -26,11 +27,18 @@ describe('local seed data', () => {
       expect(row.userId).toBe(SEED_USER_ID)
     }
     for (const row of data.transactions) {
-      if (row.categoryId) expect(categoryIds.has(row.categoryId)).toBe(true)
       if (row.accountId) expect(accountIds.has(row.accountId)).toBe(true)
       if (row.counterAccountId) expect(accountIds.has(row.counterAccountId)).toBe(true)
       if (row.recurrenceRuleId) expect(ruleIds.has(row.recurrenceRuleId)).toBe(true)
       if (row.installmentPlanId) expect(planIds.has(row.installmentPlanId)).toBe(true)
+    }
+    for (const row of data.transactionTags) {
+      expect(data.transactions.some(({ id }) => id === row.transactionId)).toBe(true)
+      expect(categoryIds.has(row.tagId)).toBe(true)
+    }
+    for (const row of data.recurrenceRuleTags) {
+      expect(ruleIds.has(row.recurrenceRuleId)).toBe(true)
+      expect(categoryIds.has(row.tagId)).toBe(true)
     }
 
     for (const plan of data.installmentPlans) {

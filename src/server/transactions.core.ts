@@ -1,30 +1,47 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '#/db/index'
-import { account, installmentPlan, recurrenceRule, transaction } from '#/db/schema'
+import { account, installmentPlan, recurrenceRule, recurrenceRuleTag, tag, transaction, transactionTag } from '#/db/schema'
 import { addMonths, splitInstallments } from '#/lib/installments'
 import { assertMoney } from '#/lib/money'
-import type { TransactionInput, TransferInput } from './schemas'
+import { transferNote } from '#/lib/transaction-labels'
+import { inputTagIds, type TransactionInput, type TransferInput } from './schemas'
+
+async function assertOwnedTags(userId: string, tagIds: string[]) {
+  if (!tagIds.length) return
+  const rows = await db.select({ id: tag.id }).from(tag).where(and(eq(tag.userId, userId), inArray(tag.id, tagIds)))
+  if (rows.length !== tagIds.length) throw new Error('One or more tags do not exist')
+}
+
+const transactionTagRows = (transactionId: string, tagIds: string[]) => tagIds.map((tagId) => ({ transactionId, tagId }))
+const recurrenceTagRows = (recurrenceRuleId: string, tagIds: string[]) => tagIds.map((tagId) => ({ recurrenceRuleId, tagId }))
 
 export async function createTransactionCore(userId: string, input: TransactionInput) {
   assertMoney(input.amount)
-  const [row] = await db.insert(transaction).values({
-    userId, type: input.type, amount: input.amount, date: input.date,
-    categoryId: input.category_id ?? null, accountId: input.account_id ?? null, note: input.note ?? null,
-  }).returning({ id: transaction.id })
-  return { id: row.id }
+  const tagIds = inputTagIds(input)
+  await assertOwnedTags(userId, tagIds)
+  return db.transaction(async (tx) => {
+    const [row] = await tx.insert(transaction).values({
+      userId, type: input.type, amount: input.amount, date: input.date,
+      accountId: input.account_id ?? null, note: input.note ?? null,
+    }).returning({ id: transaction.id })
+    if (tagIds.length) await tx.insert(transactionTag).values(transactionTagRows(row.id, tagIds))
+    return { id: row.id }
+  })
 }
 
 export async function createTransferCore(userId: string, input: TransferInput) {
   assertMoney(input.amount)
   const [row] = await db.insert(transaction).values({
     userId, type: 'transfer', amount: input.amount, date: input.date,
-    accountId: input.account_id, counterAccountId: input.counter_account_id, note: input.note ?? null,
+    accountId: input.account_id, counterAccountId: input.counter_account_id, note: transferNote(input.note),
   }).returning({ id: transaction.id })
   return { id: row.id }
 }
 
 export async function createInstallmentPlanCore(userId: string, input: TransactionInput & { installments: { count: number } }) {
   assertMoney(input.amount)
+  const tagIds = inputTagIds(input)
+  await assertOwnedTags(userId, tagIds)
   if (input.type !== 'expend' || !input.account_id) throw new Error('Installments require an expense and credit-card account')
   const [ownedAccount] = await db.select({ kind: account.kind }).from(account).where(
     and(eq(account.id, input.account_id), eq(account.userId, userId)),
@@ -36,11 +53,12 @@ export async function createInstallmentPlanCore(userId: string, input: Transacti
       userId, accountId: input.account_id!, totalAmount: input.amount,
       count: input.installments.count, startDate: input.date, note: input.note ?? null,
     }).returning({ id: installmentPlan.id })
-    await tx.insert(transaction).values(amounts.map((amount, index) => ({
+    const rows = await tx.insert(transaction).values(amounts.map((amount, index) => ({
       userId, type: 'expend' as const, amount, date: addMonths(input.date, index),
-      categoryId: input.category_id ?? null, accountId: input.account_id!,
+      accountId: input.account_id!,
       installmentPlanId: plan.id, note: input.note ?? null,
-    })))
+    }))).returning({ id: transaction.id })
+    if (tagIds.length) await tx.insert(transactionTag).values(rows.flatMap((row) => transactionTagRows(row.id, tagIds)))
     if (amounts.reduce((sum, value) => sum + value, 0) !== input.amount) throw new Error('Installment split drift')
     return { id: plan.id, rows: amounts.length }
   })
@@ -48,9 +66,14 @@ export async function createInstallmentPlanCore(userId: string, input: Transacti
 
 export async function createRecurrenceRuleCore(userId: string, input: TransactionInput & { recurrence: { interval: 'daily' | 'weekly' | 'monthly' | 'yearly' } }) {
   assertMoney(input.amount)
-  const [row] = await db.insert(recurrenceRule).values({
-    userId, type: input.type, amount: input.amount, interval: input.recurrence.interval,
-    nextRun: input.date, categoryId: input.category_id ?? null, note: input.note ?? null,
-  }).returning({ id: recurrenceRule.id })
-  return { id: row.id }
+  const tagIds = inputTagIds(input)
+  await assertOwnedTags(userId, tagIds)
+  return db.transaction(async (tx) => {
+    const [row] = await tx.insert(recurrenceRule).values({
+      userId, type: input.type, amount: input.amount, interval: input.recurrence.interval,
+      nextRun: input.date, note: input.note ?? null,
+    }).returning({ id: recurrenceRule.id })
+    if (tagIds.length) await tx.insert(recurrenceRuleTag).values(recurrenceTagRows(row.id, tagIds))
+    return { id: row.id }
+  })
 }

@@ -12,7 +12,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Category, Transaction } from "#/db/schema";
+import type { Category } from "#/db/schema";
+import type { TransactionRow } from "#/server/transactions";
 import type { FaturaRow } from "#/server/faturas.core";
 import { addMonths } from "#/lib/installments";
 import { formatCentsBRL } from "#/lib/money";
@@ -56,7 +57,7 @@ function sliceColor(name: string, index: number) {
 }
 
 type Props = {
-  transactions: Transaction[];
+  transactions: TransactionRow[];
   categories: Category[];
   faturas: FaturaRow[];
   showValues: boolean;
@@ -85,7 +86,7 @@ export function ReportCharts({
   const periodTransactions = useMemo(
     () =>
       transactions.filter(
-        (t): t is Transaction & { type: "earn" | "expend" } =>
+        (t): t is TransactionRow & { type: "earn" | "expend" } =>
           t.type !== "transfer" && t.date.slice(0, 7) === activeMonth
       ),
     [transactions, activeMonth]
@@ -101,28 +102,49 @@ export function ReportCharts({
     return { earn, expend, net: earn - expend };
   }, [periodTransactions]);
 
-  const categoryNames = useMemo(
-    () => new Map(categories.map((c) => [c.id, c.name])),
+  const categoryById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c])),
     [categories]
   );
 
   const byCategory = useMemo(() => {
-    const sums = new Map<string, number>();
+    const sums = new Map<string, { value: number; color: string }>();
     for (const t of periodTransactions) {
       if (t.type !== "expend") continue;
-      const name = categoryNames.get(t.categoryId ?? "") ?? "Sem categoria";
-      sums.set(name, (sums.get(name) ?? 0) + t.amount);
+      const tags = t.tags.length
+        ? t.tags
+        : [
+            {
+              id: "untagged",
+              userId: t.userId,
+              name: "Sem etiqueta",
+              color: CHART_OTHER,
+            },
+          ];
+      for (const txTag of tags) {
+        const current = categoryById.get(txTag.id) ?? txTag;
+        const row = sums.get(current.name) ?? {
+          value: 0,
+          color: current.color,
+        };
+        row.value += t.amount;
+        sums.set(current.name, row);
+      }
     }
     const ranked = [...sums.entries()]
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, row]) => ({ name, value: row.value, color: row.color }))
       .sort((a, b) => b.value - a.value);
     if (ranked.length <= MAX_CATEGORY_SLICES) return ranked;
     const tail = ranked.slice(MAX_CATEGORY_SLICES);
     return [
       ...ranked.slice(0, MAX_CATEGORY_SLICES),
-      { name: OTHER_LABEL, value: tail.reduce((sum, row) => sum + row.value, 0) },
+      {
+        name: OTHER_LABEL,
+        value: tail.reduce((sum, row) => sum + row.value, 0),
+        color: CHART_OTHER,
+      },
     ];
-  }, [periodTransactions, categoryNames]);
+  }, [periodTransactions, categoryById]);
 
   const categoryTotal = byCategory.reduce((sum, row) => sum + row.value, 0);
 
