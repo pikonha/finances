@@ -27,7 +27,7 @@ export const transferInput = z.object({
 })
 export type TransferInput = z.infer<typeof transferInput>
 
-export const faturaPaymentInput = z.object({ account_id: z.string().uuid(), cycle_key: isoDate })
+export const faturaPaymentInput = z.object({ account_id: z.string().uuid(), cycle_key: isoDate, paid_at: isoDate.optional() })
 
 export const categoryInput = z.object({ name: z.string().trim().min(1).max(100) })
 export const accountInput = z.object({

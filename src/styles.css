@@ -28,6 +28,20 @@
   --ring: #ff3b30;
   --shadow: #0a0a0a;
   --surface-highlight: #ffffff;
+  /* Chart palette — validated (CVD ΔE 21.6 protan) against the card surface. Blue = entrada, red = saída. */
+  --chart-in: #2a78d6;
+  --chart-out: #e34948;
+  --chart-grid: #ded9cc;
+  --chart-axis: #b3ac9c;
+  --chart-label: #6f6a5f;
+  /* Categorical slots, fixed order (validated: worst adjacent CVD ΔE 9.1). */
+  --chart-c1: #2a78d6;
+  --chart-c2: #eb6834;
+  --chart-c3: #1baf7a;
+  --chart-c4: #eda100;
+  --chart-c5: #e87ba4;
+  --chart-c6: #008300;
+  --chart-other: #898781;
 }
 .dark {
   color-scheme: dark;
@@ -52,6 +66,18 @@
   --ring: #f4c95d;
   --shadow: #050403;
   --surface-highlight: #37322c;
+  --chart-in: #3987e5;
+  --chart-out: #e66767;
+  --chart-grid: #2f2c28;
+  --chart-axis: #4a453e;
+  --chart-label: #a09889;
+  --chart-c1: #3987e5;
+  --chart-c2: #d95926;
+  --chart-c3: #199e70;
+  --chart-c4: #c98500;
+  --chart-c5: #d55181;
+  --chart-c6: #008300;
+  --chart-other: #898781;
 }
 @theme inline {
   --font-sans: "Manrope",ui-sans-serif,system-ui,sans-serif;

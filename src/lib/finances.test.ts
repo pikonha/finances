@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { assertMoney, balanceOf, signedAmount } from './money'
+import {
+  assertMoney,
+  balanceOf,
+  formatCentsBRL,
+  parseMoneyInputToCents,
+  signedAmount,
+} from './money'
 import { splitInstallments, addMonths } from './installments'
 import {
   advance,
@@ -38,6 +44,18 @@ describe('balance', () => {
         { type: 'expend', amount: 800 },
       ]),
     ).toBe(3000)
+  })
+})
+
+describe('money input mask helpers', () => {
+  it('parses typed and pasted BRL text to integer cents', () => {
+    expect(parseMoneyInputToCents('1234')).toBe(1234)
+    expect(parseMoneyInputToCents('R$ 1.234,56')).toBe(123456)
+    expect(parseMoneyInputToCents('')).toBeNull()
+  })
+
+  it('formats integer cents as BRL', () => {
+    expect(formatCentsBRL(1234).replace(/\s/g, ' ')).toBe('R$ 12,34')
   })
 })
 

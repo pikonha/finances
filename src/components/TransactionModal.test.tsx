@@ -51,9 +51,11 @@ describe("TransactionModal", () => {
     expect(within(dialog).getByLabelText("Repetir").textContent).toContain(
       "Não repetir"
     );
-    fireEvent.change(within(dialog).getByLabelText("Valor (R$)"), {
-      target: { value: "12.34" },
-    });
+    const amountInput = within(dialog).getByLabelText("Valor (R$)");
+    fireEvent.change(amountInput, { target: { value: "1234" } });
+    expect((amountInput as HTMLInputElement).value.replace(/\s/g, " ")).toBe(
+      "R$ 12,34"
+    );
     expect(within(dialog).getByLabelText("Data").tagName).toBe("BUTTON");
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Categoria: Nenhuma" })
@@ -105,7 +107,7 @@ describe("TransactionModal", () => {
     expect(repeatSelect.textContent).toContain("Mensal");
 
     fireEvent.change(within(dialog).getByLabelText("Valor (R$)"), {
-      target: { value: "10" },
+      target: { value: "1000" },
     });
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Adicionar transação" })
@@ -134,7 +136,7 @@ describe("TransactionModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Adicionar despesa" }));
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Valor (R$)"), {
-      target: { value: "1" },
+      target: { value: "100" },
     });
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Adicionar transação" })

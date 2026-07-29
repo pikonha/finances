@@ -16,7 +16,7 @@ export const markFaturaPaid = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const userId = await requireUser()
     await db.insert(faturaPayment).values({
-      userId, accountId: data.account_id, cycleKey: data.cycle_key, paidAt: new Date().toISOString().slice(0, 10),
+      userId, accountId: data.account_id, cycleKey: data.cycle_key, paidAt: data.paid_at ?? new Date().toISOString().slice(0, 10),
     }).onConflictDoNothing()
     return { success: true }
   })

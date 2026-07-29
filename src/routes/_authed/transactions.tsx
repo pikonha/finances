@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { listAccounts } from "#/server/accounts";
 import { createCategory, listCategories } from "#/server/categories";
 import {
@@ -23,12 +23,10 @@ import {
   optimisticTransaction,
   optimisticTransfer,
 } from "#/lib/optimistic";
-import {
-  localMonthKey,
-  scheduledDatesInMonth,
-  shiftMonth,
-} from "#/lib/recurrence";
+import { localMonthKey, scheduledDatesInMonth } from "#/lib/recurrence";
 import { CategorySelect } from "@/components/CategorySelect";
+import { MonthNav } from "@/components/MonthNav";
+import { MoneyInput } from "@/components/MoneyInput";
 import { TransferModal } from "@/components/TransferModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,14 +63,17 @@ type Repeat =
   | "installments";
 const money = (c: number) =>
   (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-const monthLabel = (key: string) =>
-  new Date(key + "-01T00:00:00Z").toLocaleDateString("pt-BR", {
-    month: "long",
-    year: "numeric",
+const dayLabel = (date: string) =>
+  new Date(date + "T00:00:00Z").toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
     timeZone: "UTC",
   });
-const kindLabel = (k: string) =>
-  k === "credit_card" ? "cartão de crédito" : "conta bancária";
+const weekdayLabel = (date: string) =>
+  new Date(date + "T00:00:00Z").toLocaleDateString("pt-BR", {
+    weekday: "short",
+    timeZone: "UTC",
+  });
 
 function Transactions() {
   const qc = useQueryClient();
@@ -97,7 +98,7 @@ function Transactions() {
     queryFn: () => listRecurrenceRules(),
   });
   const [type, setType] = useState<"earn" | "expend">("expend"),
-    [amount, setAmount] = useState(""),
+    [amount, setAmount] = useState<number | null>(null),
     [date, setDate] = useState(localDateKey),
     [categoryId, setCategoryId] = useState(""),
     [accountId, setAccountId] = useState(""),
@@ -132,7 +133,7 @@ function Transactions() {
     onError: (_error, _data, context) =>
       qc.setQueryData(financeQueryKeys.transactions, context?.previous),
     onSuccess: () => {
-      setAmount("");
+      setAmount(null);
       setNote("");
       setRepeat("none");
     },
@@ -211,19 +212,36 @@ function Transactions() {
   // Calendar navigation is independent of existing rows, so empty and future
   // months remain reachable.
   const [activeMonth, setActiveMonth] = useState(localMonthKey);
+  const [filterAccount, setFilterAccount] = useState("");
   const monthTx = transactions.filter(
-    (t) => t.date.slice(0, 7) === activeMonth
+    (t) =>
+      t.date.slice(0, 7) === activeMonth &&
+      // transferência aparece nas duas contas envolvidas
+      (!filterAccount ||
+        t.accountId === filterAccount ||
+        t.counterAccountId === filterAccount),
   );
   const scheduled = useMemo(
     () =>
-      recurrenceRules.flatMap((rule) =>
-        scheduledDatesInMonth(rule.interval, rule.nextRun, activeMonth).map(
-          (date) => ({ rule, date }),
-        ),
-      ),
-    [activeMonth, recurrenceRules],
+      // ponytail: recurrence_rule não tem conta, então some ao filtrar
+      filterAccount
+        ? []
+        : recurrenceRules.flatMap((rule) =>
+            scheduledDatesInMonth(rule.interval, rule.nextRun, activeMonth).map(
+              (date) => ({ rule, date }),
+            ),
+          ),
+    [activeMonth, recurrenceRules, filterAccount],
   );
   // installment payment position: x/y where y=plan.count, x=1-based order within the plan.
+  const accountName = useMemo(
+    () => new Map(accounts.map((a) => [a.id, a.name])),
+    [accounts],
+  );
+  const categoryName = useMemo(
+    () => new Map(categories.map((c) => [c.id, c.name])),
+    [categories],
+  );
   const planCount = useMemo(
     () => new Map(plans.map((p) => [p.id, p.count])),
     [plans]
@@ -243,6 +261,42 @@ function Transactions() {
     }
     return idx;
   }, [transactions]);
+  // transações e recorrências agendadas numa única lista, mais recente primeiro
+  const rows = [
+    ...monthTx.map((tx) => ({
+      key: tx.id,
+      date: tx.date,
+      type: tx.type,
+      amount: tx.amount,
+      note: tx.note,
+      category: categoryName.get(tx.categoryId ?? ""),
+      account: accountName.get(tx.accountId ?? ""),
+      counterAccount: tx.counterAccountId
+        ? (accountName.get(tx.counterAccountId) ?? "—")
+        : null,
+      badges: [
+        tx.installmentPlanId &&
+          `${installIndex.get(tx.id)}/${planCount.get(tx.installmentPlanId)}`,
+        tx.recurrenceRuleId && "recorrente",
+      ].filter(Boolean) as string[],
+      pending: false,
+      onDelete: () => removeTx.mutate(tx.id),
+    })),
+    ...scheduled.map(({ rule, date }) => ({
+      key: `scheduled-${rule.id}-${date}`,
+      date,
+      type: rule.type,
+      amount: rule.amount,
+      note: rule.note,
+      category: categoryName.get(rule.categoryId ?? ""),
+      // ponytail: recurrence_rule não tem conta
+      account: undefined,
+      counterAccount: null,
+      badges: ["agendada", "recorrente"],
+      pending: removeRule.isPending,
+      onDelete: () => removeRule.mutate(rule.id),
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <main className="page-wrap rise-in py-6 sm:py-10">
@@ -266,11 +320,10 @@ function Transactions() {
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
             onSubmit={(e) => {
               e.preventDefault();
-              const dollars = Number(amount);
-              if (!dollars || dollars <= 0) return;
+              if (amount === null || amount <= 0) return;
               create.mutate({
                 type,
-                amount: Math.round(dollars * 100),
+                amount,
                 date,
                 category_id: categoryId || undefined,
                 account_id: accountId || undefined,
@@ -308,12 +361,9 @@ function Transactions() {
               </Select>
             </Field>
             <Field label="Valor (R$)">
-              <Input
-                type="number"
-                min=".01"
-                step=".01"
+              <MoneyInput
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onValueChange={setAmount}
                 required
               />
             </Field>
@@ -349,7 +399,7 @@ function Transactions() {
                   <SelectItem value={EMPTY_SELECT_VALUE}>Nenhuma</SelectItem>
                 {accounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
-                    {a.name} · {kindLabel(a.kind)}
+                    {a.name}
                   </SelectItem>
                 ))}
                 </SelectContent>
@@ -404,121 +454,111 @@ function Transactions() {
           <CardTitle>Todas as transações</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex items-center justify-center gap-4">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Mês anterior"
-              onClick={() => setActiveMonth((month) => shiftMonth(month, -1))}
-            >
-              <ChevronLeft />
-            </Button>
-            <span className="min-w-0 flex-1 text-center font-medium sm:min-w-40 sm:flex-none">
-              {activeMonth ? monthLabel(activeMonth) : "Sem transações"}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Próximo mês"
-              onClick={() => setActiveMonth((month) => shiftMonth(month, 1))}
-            >
-              <ChevronRight />
-            </Button>
+          <div className="relative mb-4 flex flex-wrap items-center justify-center gap-4">
+            <MonthNav month={activeMonth} onChange={setActiveMonth} />
+            {/* absoluto no desktop pra não desalinhar o seletor de mês do centro */}
+            <div className="w-full sm:absolute sm:inset-y-0 sm:right-0 sm:flex sm:w-auto sm:items-center">
+              <Select
+                value={filterAccount || EMPTY_SELECT_VALUE}
+                onValueChange={(value) =>
+                  setFilterAccount(value === EMPTY_SELECT_VALUE ? "" : value)
+                }
+              >
+                <SelectTrigger
+                  aria-label="Filtrar por conta"
+                  className="w-full sm:w-auto"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={EMPTY_SELECT_VALUE}>
+                    Todas as contas
+                  </SelectItem>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Nota</TableHead>
-                <TableHead>Etiquetas</TableHead>
-                <TableHead />
+                <TableHead className="w-20">Data</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead className="hidden sm:table-cell">Categoria</TableHead>
+                <TableHead className="hidden md:table-cell">Conta</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {monthTx.map((tx) => (
-                <TableRow key={tx.id}>
-                  <TableCell>{tx.date}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={tx.type === "earn" ? "default" : "secondary"}
+              {rows.map((row) => (
+                <TableRow key={row.key}>
+                  <TableCell className="align-top tabular-nums">
+                    <div className="font-medium">{dayLabel(row.date)}</div>
+                    <div className="text-xs capitalize text-muted-foreground">
+                      {weekdayLabel(row.date)}
+                    </div>
+                  </TableCell>
+                  <TableCell className="max-w-[16rem] whitespace-normal align-top">
+                    <span
+                      className={
+                        row.note ? "font-medium" : "text-muted-foreground"
+                      }
                     >
-                      {tx.type === "earn" ? "receita" : "despesa"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell
-                    className={
-                      tx.type === "earn"
-                        ? "text-emerald-600"
-                        : "text-destructive"
-                    }
-                  >
-                    {tx.type === "earn" ? "+" : "−"}
-                    {money(tx.amount)}
-                  </TableCell>
-                  <TableCell>{tx.note || "—"}</TableCell>
-                  <TableCell>
-                    {tx.installmentPlanId && (
-                      <Badge variant="outline">
-                        {installIndex.get(tx.id)}/
-                        {planCount.get(tx.installmentPlanId)}
-                      </Badge>
-                    )}{" "}
-                    {tx.recurrenceRuleId && (
-                      <Badge variant="outline">recorrente</Badge>
+                      {row.note || "Sem descrição"}
+                    </span>
+                    {row.badges.length > 0 && (
+                      <span className="ml-2 inline-flex gap-1 align-middle">
+                        {row.badges.map((badge) => (
+                          <Badge key={badge} variant="outline">
+                            {badge}
+                          </Badge>
+                        ))}
+                      </span>
                     )}
+                    {/* conta e categoria viram linha secundária onde as colunas somem */}
+                    <div className="text-xs text-muted-foreground md:hidden">
+                      <span className="sm:hidden">{row.category ?? "—"} · </span>
+                      {row.account ?? "—"}
+                      {row.counterAccount && ` → ${row.counterAccount}`}
+                    </div>
                   </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeTx.mutate(tx.id)}
-                    >
-                      Excluir
-                    </Button>
+                  <TableCell className="hidden align-top text-muted-foreground sm:table-cell">
+                    {row.category ?? "—"}
                   </TableCell>
-                </TableRow>
-              ))}
-              {scheduled.map(({ rule, date }) => (
-                <TableRow key={`scheduled-${rule.id}-${date}`}>
-                  <TableCell>{date}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={rule.type === "earn" ? "default" : "secondary"}
-                    >
-                      {rule.type === "earn" ? "receita" : "despesa"}
-                    </Badge>
+                  <TableCell className="hidden align-top text-muted-foreground md:table-cell">
+                    {row.account ?? "—"}
+                    {row.counterAccount && ` → ${row.counterAccount}`}
                   </TableCell>
                   <TableCell
-                    className={
-                      rule.type === "earn"
+                    className={`align-top text-right font-bold tabular-nums ${
+                      row.type === "earn"
                         ? "text-emerald-600"
                         : "text-destructive"
-                    }
+                    }`}
                   >
-                    {rule.type === "earn" ? "+" : "−"}
-                    {money(rule.amount)}
+                    {row.type === "earn" ? "+" : "−"}
+                    {money(row.amount)}
                   </TableCell>
-                  <TableCell>{rule.note || "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">agendada · recorrente</Badge>
-                  </TableCell>
-                  <TableCell>
+                  <TableCell className="align-top">
                     <Button
-                      variant="destructive"
-                      size="sm"
-                      disabled={removeRule.isPending}
-                      onClick={() => removeRule.mutate(rule.id)}
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Excluir"
+                      className="size-8 text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      disabled={row.pending}
+                      onClick={row.onDelete}
                     >
-                      Excluir
+                      <Trash2 className="size-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
-              {monthTx.length === 0 && scheduled.length === 0 && (
+              {rows.length === 0 && (
                 <TableRow>
                   <TableCell
                     colSpan={6}

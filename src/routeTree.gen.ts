@@ -16,6 +16,7 @@ import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as ApiTransactionsRouteImport } from './routes/api/transactions'
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as AuthedTransactionsRouteImport } from './routes/_authed/transactions'
+import { Route as AuthedReportRouteImport } from './routes/_authed/report'
 import { Route as AuthedFaturasRouteImport } from './routes/_authed/faturas'
 import { Route as AuthedAccountsRouteImport } from './routes/_authed/accounts'
 import { Route as DotwellKnownOauthProtectedResourceRouteImport } from './routes/[.]well-known.oauth-protected-resource'
@@ -56,6 +57,11 @@ const ApiMcpRoute = ApiMcpRouteImport.update({
 const AuthedTransactionsRoute = AuthedTransactionsRouteImport.update({
   id: '/transactions',
   path: '/transactions',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedReportRoute = AuthedReportRouteImport.update({
+  id: '/report',
+  path: '/report',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedFaturasRoute = AuthedFaturasRouteImport.update({
@@ -105,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/accounts': typeof AuthedAccountsRoute
   '/faturas': typeof AuthedFaturasRoute
+  '/report': typeof AuthedReportRoute
   '/transactions': typeof AuthedTransactionsRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/transactions': typeof ApiTransactionsRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/accounts': typeof AuthedAccountsRoute
   '/faturas': typeof AuthedFaturasRoute
+  '/report': typeof AuthedReportRoute
   '/transactions': typeof AuthedTransactionsRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/transactions': typeof ApiTransactionsRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof DotwellKnownOauthProtectedResourceRoute
   '/_authed/accounts': typeof AuthedAccountsRoute
   '/_authed/faturas': typeof AuthedFaturasRoute
+  '/_authed/report': typeof AuthedReportRoute
   '/_authed/transactions': typeof AuthedTransactionsRoute
   '/api/mcp': typeof ApiMcpRoute
   '/api/transactions': typeof ApiTransactionsRoute
@@ -154,6 +163,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/accounts'
     | '/faturas'
+    | '/report'
     | '/transactions'
     | '/api/mcp'
     | '/api/transactions'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/accounts'
     | '/faturas'
+    | '/report'
     | '/transactions'
     | '/api/mcp'
     | '/api/transactions'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/_authed/accounts'
     | '/_authed/faturas'
+    | '/_authed/report'
     | '/_authed/transactions'
     | '/api/mcp'
     | '/api/transactions'
@@ -256,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedTransactionsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/report': {
+      id: '/_authed/report'
+      path: '/report'
+      fullPath: '/report'
+      preLoaderRoute: typeof AuthedReportRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/faturas': {
       id: '/_authed/faturas'
       path: '/faturas'
@@ -311,6 +330,7 @@ declare module '@tanstack/react-router' {
 interface AuthedRouteChildren {
   AuthedAccountsRoute: typeof AuthedAccountsRoute
   AuthedFaturasRoute: typeof AuthedFaturasRoute
+  AuthedReportRoute: typeof AuthedReportRoute
   AuthedTransactionsRoute: typeof AuthedTransactionsRoute
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedFaturasAccountIdRoute: typeof AuthedFaturasAccountIdRoute
@@ -319,6 +339,7 @@ interface AuthedRouteChildren {
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAccountsRoute: AuthedAccountsRoute,
   AuthedFaturasRoute: AuthedFaturasRoute,
+  AuthedReportRoute: AuthedReportRoute,
   AuthedTransactionsRoute: AuthedTransactionsRoute,
   AuthedIndexRoute: AuthedIndexRoute,
   AuthedFaturasAccountIdRoute: AuthedFaturasAccountIdRoute,

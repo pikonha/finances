@@ -18,6 +18,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
   Table,
   TableBody,
   TableCell,
@@ -25,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DatePicker, localDateKey } from "@/components/ui/date-picker";
 
 export const Route = createFileRoute("/_authed/faturas_/$accountId")({
   component: FaturaDetail,
@@ -152,12 +161,16 @@ function FaturaDetail() {
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: financeQueryKeys.faturas });
   const markPaid = useMutation({
-    mutationFn: (cycleKey: string) =>
-      markFaturaPaid({ data: { account_id: accountId, cycle_key: cycleKey } }),
-    onMutate: (cycleKey) => setPaidOptimistically(cycleKey, true),
-    onError: (_error, _cycleKey, context) => rollbackPaid(context),
+    mutationFn: ({ cycleKey, paidAt }: { cycleKey: string; paidAt: string }) =>
+      markFaturaPaid({
+        data: { account_id: accountId, cycle_key: cycleKey, paid_at: paidAt },
+      }),
+    onMutate: ({ cycleKey }) => setPaidOptimistically(cycleKey, true),
+    onError: (_error, _vars, context) => rollbackPaid(context),
     onSettled: refresh,
   });
+  const [payDate, setPayDate] = useState(localDateKey);
+  const [askingPayDate, setAskingPayDate] = useState(false);
   const unmarkPaid = useMutation({
     mutationFn: (cycleKey: string) =>
       unmarkFaturaPaid({ data: { account_id: accountId, cycle_key: cycleKey } }),
@@ -214,13 +227,44 @@ function FaturaDetail() {
             ) : (
               <Button
                 disabled={markPaid.isPending}
-                onClick={() => markPaid.mutate(selected.cycleKey)}
+                onClick={() => {
+                  setPayDate(localDateKey());
+                  setAskingPayDate(true);
+                }}
               >
                 Marcar como paga
               </Button>
             ))}
         </CardHeader>
       </Card>
+      <Dialog open={askingPayDate} onOpenChange={setAskingPayDate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Quando a fatura foi paga?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="fatura-pay-date">Data do pagamento</Label>
+            <DatePicker id="fatura-pay-date" value={payDate} onChange={setPayDate} required />
+          </div>
+          <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <DialogClose asChild>
+              <Button type="button" variant="ghost">
+                Cancelar
+              </Button>
+            </DialogClose>
+            <Button
+              disabled={markPaid.isPending}
+              onClick={() => {
+                if (!selected) return;
+                markPaid.mutate({ cycleKey: selected.cycleKey, paidAt: payDate });
+                setAskingPayDate(false);
+              }}
+            >
+              Confirmar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-center gap-4">

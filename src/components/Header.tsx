@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { to: "/transactions", label: "Transações" },
   { to: "/accounts", label: "Contas" },
   { to: "/faturas", label: "Faturas" },
+  { to: "/report", label: "Relatórios" },
 ] as const;
 
 export default function Header() {

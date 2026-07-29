@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import type { CreateTransactionInput } from "#/server/schemas";
 import { CategorySelect } from "./CategorySelect";
+import { MoneyInput } from "./MoneyInput";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -52,7 +53,7 @@ export function TransactionModal({
   onCreateCategory,
 }: TransactionModalProps) {
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<number | null>(null);
   const [date, setDate] = useState(today);
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
@@ -70,7 +71,7 @@ export function TransactionModal({
   }, [canInstall, repeat]);
 
   const reset = () => {
-    setAmount("");
+    setAmount(null);
     setDate(today());
     setCategoryId("");
     setAccountId("");
@@ -119,15 +120,14 @@ export function TransactionModal({
           className="space-y-4"
           onSubmit={async (event) => {
             event.preventDefault();
-            const dollars = Number(amount);
-            if (!Number.isFinite(dollars) || dollars <= 0) return;
+            if (amount === null || amount <= 0) return;
 
             setIsSaving(true);
             setError("");
             try {
               await onCreate({
                 type,
-                amount: Math.round(dollars * 100),
+                amount,
                 date,
                 category_id: categoryId || undefined,
                 account_id: accountId || undefined,
@@ -164,13 +164,10 @@ export function TransactionModal({
               />
             </Field>
             <Field label="Valor (R$)" htmlFor="transaction-amount">
-              <Input
+              <MoneyInput
                 id="transaction-amount"
-                type="number"
-                min=".01"
-                step=".01"
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onValueChange={setAmount}
                 required
                 autoFocus
               />

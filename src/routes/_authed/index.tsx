@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, BarChart3, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { listAccounts } from "#/server/accounts";
 import { createCategory, listCategories } from "#/server/categories";
@@ -21,7 +21,7 @@ import {
   optimisticTransaction,
   optimisticTransfer,
 } from "#/lib/optimistic";
-import { DashboardCharts } from "@/components/DashboardCharts";
+import { StatTile } from "@/components/charts";
 import { TransactionModal } from "@/components/TransactionModal";
 import { TransferModal } from "@/components/TransferModal";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,19 @@ function Dashboard() {
     ): transaction is typeof transaction & { type: "earn" | "expend" } =>
       transaction.type !== "transfer"
   );
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const monthTransactions = statsTransactions.filter((transaction) =>
+    transaction.date.startsWith(monthKey)
+  );
+  const sumByType = (type: "earn" | "expend") =>
+    monthTransactions
+      .filter((transaction) => transaction.type === type)
+      .reduce((total, transaction) => total + transaction.amount, 0);
+  const monthEarn = sumByType("earn");
+  const monthExpend = sumByType("expend");
+  const currentFaturasTotal = faturas
+    .filter((fatura) => fatura.isCurrent)
+    .reduce((total, fatura) => total + fatura.total, 0);
   const create = useMutation({
     mutationFn: (data: CreateTransactionInput) => createTransaction({ data }),
     onMutate: async (data) => {
@@ -194,12 +207,6 @@ function Dashboard() {
           />
         </div>
       </div>
-      <DashboardCharts
-        transactions={transactions}
-        categories={categories}
-        faturas={faturas}
-        showValues={showValues}
-      />
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-sm text-muted-foreground">
@@ -207,16 +214,42 @@ function Dashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-3xl font-bold sm:text-4xl">
+          <p className="text-4xl font-bold sm:text-5xl">
             {displayMoney(balanceOf(statsTransactions))}
           </p>
-          <Button asChild className="mt-6">
-            <Link to="/transactions">
-              Gerenciar transações <ArrowRight className="size-4" />
-            </Link>
-          </Button>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button asChild>
+              <Link to="/transactions">
+                Gerenciar transações <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/report">
+                <BarChart3 className="size-4" /> Ver relatórios
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile
+          label="Receitas do mês"
+          value={displayMoney(monthEarn)}
+        />
+        <StatTile
+          label="Despesas do mês"
+          value={displayMoney(monthExpend)}
+        />
+        <StatTile
+          label="Resultado do mês"
+          value={displayMoney(monthEarn - monthExpend)}
+          negative={monthEarn - monthExpend < 0}
+        />
+        <StatTile
+          label="Fatura atual"
+          value={displayMoney(currentFaturasTotal)}
+        />
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Transações recentes</CardTitle>

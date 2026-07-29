@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { DashboardCharts } from "./DashboardCharts";
+import { ReportCharts } from "./ReportCharts";
 import type { Category, Transaction } from "#/db/schema";
 import type { FaturaRow } from "#/server/faturas.core";
 
@@ -9,13 +9,22 @@ afterEach(cleanup);
 
 const category: Category = { id: "cat-1", userId: "u1", name: "Mercado" };
 
+// The default report period is the current month, so fixtures are relative to it.
+const now = new Date();
+const pad = (value: number) => String(value).padStart(2, "0");
+const dayThisMonth = (day: number) =>
+  `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(day)}`;
+const dayLastMonth = (day: number) => {
+  const date = new Date(now.getFullYear(), now.getMonth() - 1, day);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(day)}`;
+};
 function tx(overrides: Partial<Transaction>): Transaction {
   return {
     id: "t1",
     userId: "u1",
     type: "expend",
     amount: 1000,
-    date: "2026-07-10",
+    date: dayThisMonth(10),
     categoryId: null,
     accountId: null,
     counterAccountId: null,
@@ -28,7 +37,7 @@ function tx(overrides: Partial<Transaction>): Transaction {
   };
 }
 
-describe("DashboardCharts", () => {
+describe("ReportCharts", () => {
   it("renders category breakdown, next fatura and committed timeline", () => {
     const transactions = [
       tx({ id: "t1", type: "expend", amount: 5000, categoryId: "cat-1" }),
@@ -49,7 +58,7 @@ describe("DashboardCharts", () => {
     ];
 
     render(
-      <DashboardCharts
+      <ReportCharts
         transactions={transactions}
         categories={[category]}
         faturas={faturas}
@@ -63,7 +72,7 @@ describe("DashboardCharts", () => {
 
   it("shows empty state when there is nothing in range", () => {
     render(
-      <DashboardCharts
+      <ReportCharts
         transactions={[]}
         categories={[]}
         faturas={[]}
@@ -81,7 +90,7 @@ describe("DashboardCharts", () => {
 
   it("masks monetary values when privacy mode is enabled", () => {
     render(
-      <DashboardCharts
+      <ReportCharts
         transactions={[]}
         categories={[]}
         faturas={[
@@ -101,7 +110,44 @@ describe("DashboardCharts", () => {
       />
     );
 
-    expect(screen.getByText("••••••")).toBeTruthy();
+    expect(screen.getAllByText("••••••").length).toBeGreaterThan(0);
     expect(screen.queryByText("R$ 120,00")).toBeNull();
+  });
+
+  it("defaults the period to the current month", () => {
+    render(
+      <ReportCharts
+        transactions={[
+          tx({ id: "t1", amount: 5000, date: dayThisMonth(10) }),
+          tx({ id: "t2", amount: 9000, date: dayLastMonth(10) }),
+        ]}
+        categories={[]}
+        faturas={[]}
+        showValues
+      />
+    );
+
+    expect(screen.getAllByText("R$ 50,00").length).toBeGreaterThan(0);
+    expect(screen.queryByText("R$ 90,00")).toBeNull();
+    expect(screen.queryByText("R$ 140,00")).toBeNull();
+  });
+
+  it("navigates whole months", () => {
+    render(
+      <ReportCharts
+        transactions={[
+          tx({ id: "t1", amount: 5000, date: dayThisMonth(10) }),
+          tx({ id: "t2", amount: 9000, date: dayLastMonth(10) }),
+        ]}
+        categories={[]}
+        faturas={[]}
+        showValues
+      />
+    );
+
+    fireEvent.click(screen.getByLabelText("Mês anterior"));
+
+    expect(screen.getAllByText("R$ 90,00").length).toBeGreaterThan(0);
+    expect(screen.queryByText("R$ 50,00")).toBeNull();
   });
 });
