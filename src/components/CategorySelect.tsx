@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown, LoaderCircle, Plus, Search } from "lucide-react";
 import { DEFAULT_TAG_COLOR } from "#/lib/tag-colors";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,9 @@ export function CategorySelect({
   const [error, setError] = useState("");
   const [newColor, setNewColor] = useState<string>(DEFAULT_TAG_COLOR);
   const [createdCategories, setCreatedCategories] = useState<CategoryOption[]>([]);
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listboxId = useId();
 
@@ -111,21 +114,33 @@ export function CategorySelect({
 
   useEffect(() => {
     if (!open) return;
+    const updatePosition = () => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPosition({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const handleOutsideClick = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) close();
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+      close();
     };
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [open, isSaving]);
 
   return (
-    <div
-      ref={rootRef}
-      className="relative"
-      onBlur={(event) => {
-        if (open && !event.currentTarget.contains(event.relatedTarget as Node | null)) close();
-      }}
-    >
+    <div ref={rootRef} className="relative">
       <button
         type="button"
         className={cn(
@@ -152,8 +167,16 @@ export function CategorySelect({
         <ChevronDown aria-hidden="true" className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} />
       </button>
 
-      {open && (
-        <div className="brutal-shadow absolute z-50 mt-1 w-full border-2 border-foreground bg-popover text-popover-foreground sm:min-w-64">
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          className="brutal-shadow fixed z-50 border-2 border-foreground bg-popover text-popover-foreground sm:min-w-64"
+          style={{ top: position.top, left: position.left, width: position.width }}
+          onBlur={(event) => {
+            const nextTarget = event.relatedTarget as Node | null;
+            if (open && !rootRef.current?.contains(nextTarget) && !dropdownRef.current?.contains(nextTarget)) close();
+          }}
+        >
           <div className="relative border-b-2 border-foreground">
             <Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -263,7 +286,8 @@ export function CategorySelect({
               {error}
             </p>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

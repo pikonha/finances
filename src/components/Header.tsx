@@ -2,7 +2,6 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { LogOut, Menu, WalletCards } from "lucide-react";
 import { authClient } from "#/lib/auth-client";
 import { Button } from "./ui/button";
-import ThemeToggle from "./ThemeToggle";
 
 const NAV_LINKS = [
   { to: "/", label: "Painel" },
@@ -69,7 +68,6 @@ export default function Header() {
           </div>
         )}
         <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-          <ThemeToggle />
           {session?.user && (
             <>
               <span className="hidden text-xs text-muted-foreground md:inline">

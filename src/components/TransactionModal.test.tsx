@@ -45,7 +45,7 @@ describe("TransactionModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "Adicionar receita" }));
 
     const dialog = screen.getByRole("dialog");
-    // Themed tokens, not hardcoded white/black — the modal has to work in dark mode.
+    // Themed tokens, not hardcoded white/black.
     expect(dialog.classList.contains("bg-background")).toBe(true);
     expect(dialog.classList.contains("bg-white")).toBe(false);
     expect(within(dialog).getByLabelText("Repetir").textContent).toContain(
@@ -65,7 +65,7 @@ describe("TransactionModal", () => {
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Etiquetas: Nenhuma" })
     );
-    fireEvent.click(within(dialog).getByRole("option", { name: "Groceries" }));
+    fireEvent.click(screen.getByRole("option", { name: "Groceries" }));
     fireEvent.click(within(dialog).getByLabelText("Conta"));
     fireEvent.click(
       screen.getByRole("option", { name: "Checking · conta bancária" })

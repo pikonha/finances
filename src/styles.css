@@ -1,9 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Manrope:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
-@custom-variant dark (&:is(.dark *));
 
-/* Neo-brutalism: raw geometry and hard shadows, without retina-searing dark borders. */
+/* Neo-brutalism: raw geometry and hard shadows, without retina-searing borders. */
 :root {
   color-scheme: light;
   --radius: 0px;
@@ -40,42 +39,6 @@
   --chart-c3: #1baf7a;
   --chart-c4: #eda100;
   --chart-c5: #e87ba4;
-  --chart-c6: #008300;
-  --chart-other: #898781;
-}
-.dark {
-  color-scheme: dark;
-  --background: #121211;
-  --foreground: #f2ede3;
-  --card: #1c1b19;
-  --card-foreground: #f7f1e8;
-  --popover: #24211f;
-  --popover-foreground: #f7f1e8;
-  --primary: #f4c95d;
-  --primary-foreground: #15120c;
-  --secondary: #2b2824;
-  --secondary-foreground: #f2ede3;
-  --muted: #292622;
-  --muted-foreground: #b9b1a5;
-  --accent: #67d6bd;
-  --accent-foreground: #0f231f;
-  --destructive: #ff716a;
-  --destructive-foreground: #210b0a;
-  --border: #70695f;
-  --input: #8b8275;
-  --ring: #f4c95d;
-  --shadow: #050403;
-  --surface-highlight: #37322c;
-  --chart-in: #3987e5;
-  --chart-out: #e66767;
-  --chart-grid: #2f2c28;
-  --chart-axis: #4a453e;
-  --chart-label: #a09889;
-  --chart-c1: #3987e5;
-  --chart-c2: #d95926;
-  --chart-c3: #199e70;
-  --chart-c4: #c98500;
-  --chart-c5: #d55181;
   --chart-c6: #008300;
   --chart-other: #898781;
 }
@@ -130,15 +93,5 @@
 .brutal-hover { transition:transform .1s ease, box-shadow .1s ease; }
 .brutal-hover:hover { transform:translate(-2px,-2px); box-shadow:6px 6px 0 0 var(--shadow); }
 .brutal-hover:active { transform:translate(0,0); box-shadow:2px 2px 0 0 var(--shadow); }
-.dark body {
-  background-image:
-    radial-gradient(circle at 12% -8%, color-mix(in srgb,var(--primary) 8%,transparent) 0,transparent 28rem),
-    linear-gradient(color-mix(in srgb,var(--foreground) 3.5%,transparent) 1px,transparent 1px),
-    linear-gradient(90deg,color-mix(in srgb,var(--foreground) 3.5%,transparent) 1px,transparent 1px);
-}
-/* Keep brutal geometry, but use a structural gray instead of glowing white outlines. */
-.dark .border-foreground { border-color:var(--border); }
-.dark .bg-card,.dark .bg-popover { box-shadow:inset 0 1px 0 0 var(--surface-highlight); }
-.dark input:-webkit-autofill,.dark input:-webkit-autofill:hover,.dark input:-webkit-autofill:focus { -webkit-text-fill-color:#0a0a0a; -webkit-box-shadow:0 0 0 1000px #ffffff inset; caret-color:#0a0a0a; }
 .rise-in { animation:rise-in .35s cubic-bezier(.16,1,.3,1) both; }
 @keyframes rise-in { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:none } }

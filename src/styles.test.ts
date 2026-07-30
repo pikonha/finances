@@ -2,13 +2,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
-const darkTheme = css.match(/\.dark\s*\{(?<tokens>[^}]+)\}/)?.groups?.tokens ?? "";
+const rootTheme = css.match(/:root\s*\{(?<tokens>[^}]+)\}/)?.groups?.tokens ?? "";
 
 function token(name: string) {
-  const value = darkTheme.match(
+  const value = rootTheme.match(
     new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`, "i"),
   )?.[1];
-  expect(value, `missing dark theme token --${name}`).toBeDefined();
+  expect(value, `missing light theme token --${name}`).toBeDefined();
   return value!;
 }
 
@@ -31,7 +31,12 @@ function contrast(foreground: string, background: string) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-describe("dark theme accessibility", () => {
+describe("light theme accessibility", () => {
+  it("does not ship dark mode selectors", () => {
+    expect(css).not.toContain(".dark");
+    expect(css).not.toContain("prefers-color-scheme");
+  });
+
   it.each([
     ["foreground", "background"],
     ["card-foreground", "card"],

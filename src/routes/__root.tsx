@@ -14,7 +14,6 @@ export interface RouterContext {
   queryClient: QueryClient;
   session?: Session;
 }
-const THEME_INIT_SCRIPT = `(function(){try{var m=localStorage.getItem('theme')||'auto';var d=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'}catch(e){}})()`;
 const SERVICE_WORKER_SCRIPT = `if('serviceWorker'in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(error){console.error('Service worker registration failed:',error)})})}`;
 const SITE_URL = "https://grana.up.railway.app";
 const APP_TITLE = "Finances";
@@ -68,9 +67,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 });
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR">
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
