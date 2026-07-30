@@ -62,3 +62,11 @@ export type UpdateAccountInput = z.infer<typeof updateAccountInput>
 export function inputTagIds(input: { tag_ids?: string[]; category_id?: string }) {
   return [...new Set(input.tag_ids ?? (input.category_id ? [input.category_id] : []))]
 }
+
+export const importTransactionsInput = z.array(z.object({
+  type: z.enum(['earn', 'expend']), amount: cents.positive(), date: isoDate,
+  tag_names: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
+  account_id: z.string().uuid().optional(),
+  note: z.string().max(500).optional(),
+})).min(1).max(1000)
+export type ImportTransactionsInput = z.infer<typeof importTransactionsInput>

@@ -13,6 +13,14 @@ const manifest = JSON.parse(
   icons: Array<{ src: string; sizes: string; purpose: string }>;
 };
 
+function pngSize(filePath: string) {
+  const bytes = readFileSync(filePath);
+  return {
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20),
+  };
+}
+
 describe("PWA", () => {
   it("has an installable manifest with complete icons", () => {
     expect(manifest).toMatchObject({
@@ -38,5 +46,12 @@ describe("PWA", () => {
     expect(serviceWorker).toContain('url.pathname.startsWith("/api/")');
     expect(serviceWorker).not.toMatch(/cache\.put\(request[\s\S]*mode === "navigate"/);
     expect(statSync(publicPath("offline.html")).size).toBeGreaterThan(0);
+  });
+
+  it("ships a large Open Graph image", () => {
+    const imagePath = publicPath("og-image.png");
+
+    expect(statSync(imagePath).size).toBeGreaterThan(0);
+    expect(pngSize(imagePath)).toEqual({ width: 1200, height: 630 });
   });
 });

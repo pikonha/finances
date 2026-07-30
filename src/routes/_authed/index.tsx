@@ -2,12 +2,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, BarChart3, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { listAccounts } from "#/server/accounts";
+import { createAccount, listAccounts } from "#/server/accounts";
 import { createCategory, listCategories } from "#/server/categories";
 import { listFaturas } from "#/server/faturas";
 import {
   createTransaction,
   createTransfer,
+  importTransactions,
   listTransactions,
 } from "#/server/transactions";
 import type { CreateTransactionInput, TransferInput } from "#/server/schemas";
@@ -23,6 +24,7 @@ import {
   optimisticTransfer,
 } from "#/lib/optimistic";
 import { StatTile } from "@/components/charts";
+import { ImportCsvModal } from "@/components/ImportCsvModal";
 import { TransactionModal } from "@/components/TransactionModal";
 import { TransferModal } from "@/components/TransferModal";
 import { Button } from "@/components/ui/button";
@@ -150,6 +152,17 @@ function Dashboard() {
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: financeQueryKeys.transactions }),
   });
+  const importMutation = useMutation({
+    mutationFn: (data: Parameters<typeof importTransactions>[0]["data"]) => importTransactions({ data }),
+    onSettled: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: financeQueryKeys.transactions }),
+      queryClient.invalidateQueries({ queryKey: financeQueryKeys.categories }),
+    ]),
+  });
+  const createAccountMutation = useMutation({
+    mutationFn: (name: string) => createAccount({ data: { name, kind: "bank_account" } }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: financeQueryKeys.accounts }),
+  });
   const displayMoney = (cents: number) =>
     showValues ? money(cents) : "••••••";
 
@@ -205,6 +218,13 @@ function Dashboard() {
             onTransfer={async (data) => {
               await transfer.mutateAsync(data);
             }}
+          />
+          <ImportCsvModal
+            transactions={transactions}
+            accounts={accounts}
+            categories={categories}
+            onImport={(data) => importMutation.mutateAsync(data)}
+            onCreateAccount={async (name) => (await createAccountMutation.mutateAsync(name)).id}
           />
         </div>
       </div>

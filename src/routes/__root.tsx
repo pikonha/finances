@@ -16,6 +16,10 @@ export interface RouterContext {
 }
 const THEME_INIT_SCRIPT = `(function(){try{var m=localStorage.getItem('theme')||'auto';var d=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'}catch(e){}})()`;
 const SERVICE_WORKER_SCRIPT = `if('serviceWorker'in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(function(error){console.error('Service worker registration failed:',error)})})}`;
+const SITE_URL = "https://grana.up.railway.app";
+const APP_TITLE = "Finances";
+const APP_DESCRIPTION = "Controle pessoal de contas, transações, faturas e recorrências.";
+const OG_IMAGE_URL = `${SITE_URL}/og-image.png`;
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   beforeLoad: async () => ({ session: await getSessionFn() }),
@@ -23,18 +27,30 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Finances" },
-      {
-        name: "description",
-        content: "Controle pessoal de contas, transações, faturas e recorrências.",
-      },
+      { title: APP_TITLE },
+      { name: "description", content: APP_DESCRIPTION },
       { name: "theme-color", content: "#ffdb00" },
-      { name: "application-name", content: "Finances" },
+      { name: "application-name", content: APP_TITLE },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       {
         name: "apple-mobile-web-app-status-bar-style",
         content: "black-translucent",
       },
+      { property: "og:type", content: "website" },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:title", content: APP_TITLE },
+      { property: "og:description", content: APP_DESCRIPTION },
+      { property: "og:image", content: OG_IMAGE_URL },
+      { property: "og:image:secure_url", content: OG_IMAGE_URL },
+      { property: "og:image:type", content: "image/png" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: "Finances dashboard preview" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: APP_TITLE },
+      { name: "twitter:description", content: APP_DESCRIPTION },
+      { name: "twitter:image", content: OG_IMAGE_URL },
+      { name: "twitter:image:alt", content: "Finances dashboard preview" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
