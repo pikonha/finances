@@ -372,7 +372,7 @@ function Transactions() {
         ? `${installIndex.get(tx.id)}/${planCount.get(tx.installmentPlanId)}`
         : null,
       isRecurring: Boolean(tx.recurrenceRuleId),
-      pending: false,
+      pending: tx.userId === "optimistic",
       tx,
       onDelete: () => removeTx.mutate(tx.id),
     })),
@@ -685,6 +685,7 @@ function Transactions() {
                                   size="icon"
                                   aria-label="Editar"
                                   className="size-8"
+                                  disabled={row.pending}
                                 >
                                   <Pencil className="size-4" />
                                 </Button>
