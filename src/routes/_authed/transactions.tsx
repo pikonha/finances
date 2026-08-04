@@ -436,8 +436,9 @@ function Transactions() {
               });
             }}
           >
-            <Field label="Nome">
+            <Field label="Nome" htmlFor="transaction-page-note">
               <Input
+                id="transaction-page-note"
                 value={note}
                 maxLength={500}
                 onChange={(event) => setNote(event.target.value)}
@@ -457,8 +458,13 @@ function Transactions() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Valor (R$)">
-              <MoneyInput value={amount} onValueChange={setAmount} required />
+            <Field label="Valor (R$)" htmlFor="transaction-page-amount">
+              <MoneyInput
+                id="transaction-page-amount"
+                value={amount}
+                onValueChange={setAmount}
+                required
+              />
             </Field>
             <Field label="Data" htmlFor="transaction-page-date">
               <DatePicker
@@ -519,8 +525,12 @@ function Transactions() {
               </Select>
             </Field>
             {repeat === "installments" && (
-              <Field label="Número de parcelas">
+              <Field
+                label="Número de parcelas"
+                htmlFor="transaction-page-installments"
+              >
                 <Input
+                  id="transaction-page-installments"
                   type="number"
                   min="2"
                   max="60"

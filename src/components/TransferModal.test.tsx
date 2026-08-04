@@ -9,8 +9,20 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TransferModal } from "./TransferModal";
+import { localDateKey } from "./ui/date-picker";
 
 afterEach(cleanup);
+
+// ponytail: derived from the clock — the picker opens on the current month, so a
+// hardcoded date only passes during that month. Fake timers deadlock waitFor here.
+const pickedDate = new Date();
+const pickedDateKey = localDateKey(pickedDate);
+const pickedDateLabel = new Intl.DateTimeFormat("pt-BR", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+}).format(pickedDate);
 
 const accounts = [
   { id: "11111111-1111-4111-8111-111111111111", name: "Checking" },
@@ -40,14 +52,14 @@ describe("TransferModal", () => {
     });
     fireEvent.click(within(dialog).getByLabelText("Data"));
     fireEvent.click(
-      screen.getByRole("gridcell", { name: /19 de julho de 2026/i })
+      screen.getByRole("gridcell", { name: pickedDateLabel })
     );
     fireEvent.click(within(dialog).getByRole("button", { name: "Transferir" }));
 
     await waitFor(() =>
       expect(onTransfer).toHaveBeenCalledWith({
         amount: 1234,
-        date: "2026-07-19",
+        date: pickedDateKey,
         account_id: accounts[0].id,
         counter_account_id: accounts[1].id,
         note: "Transferência",

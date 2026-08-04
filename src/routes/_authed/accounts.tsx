@@ -262,8 +262,9 @@ function Accounts() {
             }}
           >
             <div className="space-y-2">
-              <Label>Nome</Label>
+              <Label htmlFor="account-name">Nome</Label>
               <Input
+                id="account-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required

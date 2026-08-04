@@ -22,6 +22,12 @@ const OG_IMAGE_URL = `${SITE_URL}/og-image.png`;
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   beforeLoad: async () => ({ session: await getSessionFn() }),
+  notFoundComponent: () => (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold">Página não encontrada</h1>
+      <p className="mt-2">A página que você procura não existe.</p>
+    </div>
+  ),
   head: () => ({
     meta: [
       { charSet: "utf-8" },

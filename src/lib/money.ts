@@ -9,6 +9,9 @@ export function assertMoney(value: unknown): number {
   if (value < 0) {
     throw new Error(`Invalid money amount: ${value} (must be non-negative)`)
   }
+  if (!Number.isSafeInteger(value)) {
+    throw new Error(`Invalid money amount: ${value} (exceeds safe integer range)`)
+  }
   return value
 }
 
