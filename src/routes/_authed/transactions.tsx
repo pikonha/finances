@@ -386,7 +386,7 @@ function Transactions() {
       tags: rule.tags,
       account: undefined,
       counterAccount: null,
-      badges: ["agendada"],
+      badges: [],
       installmentLabel: null,
       isRecurring: true,
       pending: removeRule.isPending,

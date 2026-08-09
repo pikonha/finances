@@ -16,5 +16,9 @@ export const auth = betterAuth({
     },
   }),
   emailAndPassword: { enabled: true },
+  // Railway's x-forwarded-for is a 2-hop chain, which better-auth rejects without a
+  // trustedProxies CIDR list. x-real-ip is a single value the edge overwrites, so it
+  // can't be spoofed. Without this every request shares one rate-limit bucket.
+  advanced: { ipAddress: { ipAddressHeaders: ['x-real-ip'] } },
   plugins: [mcp({ loginPage: '/login' })],
 })
