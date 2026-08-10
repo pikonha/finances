@@ -6,7 +6,7 @@ import { assertMoney } from '#/lib/money'
 import { normalizeForMatch } from '#/lib/csv'
 import { tagColorForIndex } from '#/lib/tag-colors'
 import { createTransactionInput, importTransactionsInput, inputTagIds, transferInput, updateTransactionInput } from './schemas'
-import { createInstallmentPlanCore, createRecurrenceRuleCore, createTransactionCore, createTransferCore } from './transactions.core'
+import { assertOwnedAccounts, createInstallmentPlanCore, createRecurrenceRuleCore, createTransactionCore, createTransferCore } from './transactions.core'
 import { requireUser } from './session.core'
 
 const idInput = (data: unknown) => String((data as { id: string }).id)
@@ -85,6 +85,7 @@ export const updateTransaction = createServerFn({ method: 'POST' })
     assertMoney(data.amount)
     const tagIds = inputTagIds(data)
     await assertOwnedTags(userId, tagIds)
+    await assertOwnedAccounts(userId, [data.account_id])
     return db.transaction(async (tx) => {
       const [row] = await tx.update(transaction).set({
         type: data.type,

@@ -12,6 +12,15 @@ async function assertOwnedTags(userId: string, tagIds: string[]) {
   if (rows.length !== tagIds.length) throw new Error('One or more tags do not exist')
 }
 
+export async function assertOwnedAccounts(userId: string, ids: (string | null | undefined)[]) {
+  const list = [...new Set(ids.filter((id): id is string => !!id))]
+  if (!list.length) return
+  const rows = await db.select({ id: account.id }).from(account).where(
+    and(eq(account.userId, userId), inArray(account.id, list)),
+  )
+  if (rows.length !== list.length) throw new Error('One or more accounts do not exist')
+}
+
 const transactionTagRows = (transactionId: string, tagIds: string[]) => tagIds.map((tagId) => ({ transactionId, tagId }))
 const recurrenceTagRows = (recurrenceRuleId: string, tagIds: string[]) => tagIds.map((tagId) => ({ recurrenceRuleId, tagId }))
 
@@ -19,6 +28,7 @@ export async function createTransactionCore(userId: string, input: TransactionIn
   assertMoney(input.amount)
   const tagIds = inputTagIds(input)
   await assertOwnedTags(userId, tagIds)
+  await assertOwnedAccounts(userId, [input.account_id])
   return db.transaction(async (tx) => {
     const [row] = await tx.insert(transaction).values({
       userId, type: input.type, amount: input.amount, date: input.date,
@@ -31,6 +41,7 @@ export async function createTransactionCore(userId: string, input: TransactionIn
 
 export async function createTransferCore(userId: string, input: TransferInput) {
   assertMoney(input.amount)
+  await assertOwnedAccounts(userId, [input.account_id, input.counter_account_id])
   const [row] = await db.insert(transaction).values({
     userId, type: 'transfer', amount: input.amount, date: input.date,
     accountId: input.account_id, counterAccountId: input.counter_account_id, note: transferNote(input.note),
