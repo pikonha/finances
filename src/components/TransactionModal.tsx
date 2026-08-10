@@ -104,9 +104,12 @@ export function TransactionModal({
     setError("");
   };
 
+  // ponytail: reset only on open, not on initialTransaction identity changes —
+  // realtime refetches would otherwise stomp what you're typing
   useEffect(() => {
     if (open) reset();
-  }, [initialTransaction, open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const changeOpen = (nextOpen: boolean) => {
     if (isSaving) return;
