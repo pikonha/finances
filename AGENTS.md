@@ -209,3 +209,12 @@ Stats: 1 obs (197t read) | 8,806t work | 98% savings
 
 Access 9k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as local markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` + `docs/adr/`. See `docs/agents/domain.md`.
