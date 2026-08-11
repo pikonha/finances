@@ -29,6 +29,13 @@
       "when": 1785339000000,
       "tag": "0003_colored_transaction_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786454298642,
+      "tag": "0004_cheerful_argent",
+      "breakpoints": true
     }
   ]
 }

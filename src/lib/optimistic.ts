@@ -43,6 +43,8 @@ export function optimisticTransaction(
     recurrenceRuleId: null,
     periodKey: null,
     note: input.note ?? null,
+    // Both call sites send `paid` (client clock); `true` mirrors the column default.
+    paid: input.paid ?? true,
     createdAt: new Date(),
     tags: [],
   };
@@ -59,6 +61,7 @@ export function optimisticUpdatedTransaction(
     date: input.date,
     accountId: input.account_id ?? null,
     note: input.note ?? null,
+    paid: current.paid,
   };
 }
 

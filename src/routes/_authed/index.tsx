@@ -64,8 +64,9 @@ function Dashboard() {
     ): transaction is typeof transaction & { type: "earn" | "expend" } =>
       transaction.type !== "transfer"
   );
+  const paidStatsTransactions = statsTransactions.filter((tx) => tx.paid);
   const monthKey = new Date().toISOString().slice(0, 7);
-  const monthTransactions = statsTransactions.filter((transaction) =>
+  const monthTransactions = paidStatsTransactions.filter((transaction) =>
     transaction.date.startsWith(monthKey)
   );
   const sumByType = (type: "earn" | "expend") =>
@@ -236,7 +237,7 @@ function Dashboard() {
         </CardHeader>
         <CardContent>
           <p className="text-4xl font-bold sm:text-5xl">
-            {displayMoney(balanceOf(statsTransactions))}
+            {displayMoney(balanceOf(paidStatsTransactions))}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Button asChild>
