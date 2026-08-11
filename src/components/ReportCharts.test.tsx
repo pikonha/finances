@@ -32,6 +32,7 @@ function tx(overrides: Partial<TransactionRow>): TransactionRow {
     recurrenceRuleId: null,
     periodKey: null,
     note: null,
+    paid: true,
     createdAt: null,
     tags: [],
     ...overrides,

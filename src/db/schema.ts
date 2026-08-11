@@ -44,7 +44,8 @@ export const transaction = pgTable('transaction', {
   counterAccountId: uuid('counter_account_id').references(() => account.id, { onDelete: 'set null' }),
   installmentPlanId: uuid('installment_plan_id').references(() => installmentPlan.id, { onDelete: 'cascade' }),
   recurrenceRuleId: uuid('recurrence_rule_id').references(() => recurrenceRule.id, { onDelete: 'cascade' }),
-  periodKey: text('period_key'), note: text(), createdAt: timestamp('created_at').defaultNow(),
+  periodKey: text('period_key'), note: text(), paid: boolean().notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow(),
 }, (t) => [unique('uq_recurrence_period').on(t.recurrenceRuleId, t.periodKey)])
 
 export const transactionTag = pgTable('transaction_tag', {
